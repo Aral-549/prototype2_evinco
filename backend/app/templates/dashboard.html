@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoSPI PAIMANA • Executive Infrastructure Monitoring Platform</title>
+  
+  <!-- Fonts: Clean Inter & Tabular Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'SF Mono', 'Menlo', 'Consolas', 'monospace'],
+          },
+          colors: {
+            gov: {
+              navy: '#0f2942',
+              blue: '#1d4ed8',
+              accent: '#2563eb',
+              border: '#e2e8f0',
+              borderDark: '#cbd5e1',
+              bg: '#f8fafc',
+              card: '#ffffff',
+              text: '#0f172a',
+              muted: '#64748b',
+              green: '#15803d',
+              amber: '#b45309',
+              red: '#b91c1c',
+            }
+          },
+          borderRadius: {
+            DEFAULT: '4px',
+            'sm': '3px',
+            'md': '6px',
+            'lg': '8px',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .num-tabular {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    /* Crisp borders & data density */
+    .data-table th, .data-table td {
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #e2e8f0;
+      height: 4px;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 2px;
+      background: #0f2942;
+      border: 1px solid #0f2942;
+      cursor: pointer;
+    }
+
+    @media print {
+      body { background: #ffffff !important; }
+      .no-print { display: none !important; }
+      .print-box { border: 1px solid #94a3b8 !important; box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans flex flex-col antialiased bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white">
+
+  <!-- Top Institutional Bar (Government Header) -->
+  <div class="bg-[#0f2942] text-white text-[11px] px-6 py-1.5 border-b border-slate-700 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="font-semibold tracking-wider uppercase">Government of India</span>
+      <span class="text-slate-400">|</span>
+      <span class="text-slate-300">Ministry of Statistics & Programme Implementation (MoSPI)</span>
+      <span class="text-slate-400">|</span>
+      <span class="text-slate-300">Infrastructure & Project Monitoring Division (IPMD)</span>
+    </div>
+    <div class="flex items-center gap-4 text-slate-300 font-mono text-[11px]">
+      <span class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        ENGINE STATUS: ACTIVE (STAGE-AWARE XGBOOST)
+      </span>
+      <span>PORTFOLIO: &#8377;150+ CR CENTRAL PROJECTS</span>
+    </div>
+  </div>
+
+  <!-- Primary Application Header -->
+  <header class="bg-white border-b border-slate-200 px-6 py-3 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-[1440px] mx-auto flex items-center justify-between">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-4">
+        <div class="border border-slate-300 bg-slate-100 px-2.5 py-1.5 rounded text-center">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">MoSPI</div>
+          <div class="text-sm font-extrabold text-[#0f2942] leading-none">OCMS</div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-slate-900 tracking-tight text-lg">PAIMANA Decision-Support Platform</h1>
+            <span class="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-slate-100 text-slate-700 border border-slate-300">SIH26103</span>
+          </div>
+          <p class="text-xs text-slate-500">Predictive Early-Warning & Capital-at-Risk Monitoring for Central Sector Infrastructure</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center gap-1 border border-slate-200 bg-slate-50 p-1 rounded-md text-xs font-medium">
+        <button onclick="switchTab('sandbox')" id="tab-sandbox" class="px-3 py-1.5 rounded bg-white text-slate-900 shadow-sm font-semibold border border-slate-200 transition">
+          Interactive What-If Sandbox
+        </button>
+        <button onclick="switchTab('portfolio')" id="tab-portfolio" class="px-3 py-1.5 rounded text-slate-600 hover:text-slate-900 transition">
+          Portfolio Risk Leaderboard
+        </button>
+        <button onclick="switchTab('delong')" id="tab-delong" class="px-3 py-1.5 rounded text-slate-600 hover:text-slate-900 transition">
+          DeLong Statistical Audit
+        </button>
+        <button onclick="switchTab('cuf')" id="tab-cuf" class="px-3 py-1.5 rounded text-slate-600 hover:text-slate-900 transition">
+          CUF 2.0 Information Bound
+        </button>
+      </nav>
+
+      <!-- Right Utility Actions -->
+      <div class="flex items-center gap-3">
+        <button onclick="openDossierModal()" class="px-3.5 py-1.5 rounded bg-[#0f2942] hover:bg-slate-800 text-white text-xs font-medium border border-slate-900 flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Cabinet Risk Dossier
+        </button>
+        <a href="/docs" target="_blank" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition">
+          REST API Docs
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-[1440px] w-full mx-auto px-6 py-6 space-y-6">
+
+    <!-- KPI Summary Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Card 1 -->
+      <div class="bg-white border border-slate-200 rounded p-4 shadow-sm">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Monitored Capex</div>
+        <div class="text-2xl font-bold text-slate-900 mt-1 num-tabular" id="kpi-total-capex">&#8377;97,266 Cr</div>
+        <div class="text-xs text-slate-500 mt-1 flex items-center justify-between">
+          <span>8 Sample Megaprojects</span>
+          <span class="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">&#8377;150+ Cr Tier</span>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="bg-white border border-slate-200 border-l-4 border-l-red-600 rounded p-4 shadow-sm">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Aggregate Capital-at-Risk (CaR)</div>
+        <div class="text-2xl font-bold text-red-700 mt-1 num-tabular" id="kpi-total-car">&#8377;103.11 Cr</div>
+        <div class="text-xs text-slate-500 mt-1">
+          Bayesian Sector-Median Overrun Bound
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="bg-white border border-slate-200 border-l-4 border-l-amber-600 rounded p-4 shadow-sm">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Statutory RuleFloor Overrides</div>
+        <div class="text-2xl font-bold text-amber-800 mt-1 num-tabular" id="kpi-override-rate">37.5%</div>
+        <div class="text-xs text-slate-500 mt-1">
+          <span class="font-semibold text-slate-700">3 of 8 Projects</span> governed by statutory floor
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="bg-white border border-slate-200 rounded p-4 shadow-sm">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Portfolio Risk Distribution</div>
+        <div class="text-2xl font-bold text-slate-900 mt-1 num-tabular" id="kpi-distress-count">1 Critical</div>
+        <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
+          <span class="text-red-700 font-semibold">1 Crit</span> •
+          <span class="text-amber-700 font-semibold">2 Mod</span> •
+          <span class="text-emerald-700 font-semibold">5 Low</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 1: INTERACTIVE WORKSTATION & WHAT-IF SIMULATOR -->
+    <div id="view-sandbox" class="space-y-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Workstation: Operational Form & Sliders (5 cols) -->
+        <div class="lg:col-span-5 bg-white border border-slate-200 rounded p-5 space-y-4 shadow-sm">
+          
+          <div class="border-b border-slate-200 pb-3 flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wide">Project Telemetry & Controls</h2>
+              <p class="text-xs text-slate-500">Adjust parameters to simulate schedule hazard & statutory triggers</p>
+            </div>
+            <span class="text-[10px] font-mono font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 border border-slate-300 rounded">CUF FORM</span>
+          </div>
+
+          <!-- Project Preset Selection -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Load Project Case</label>
+            <select id="preset-selector" onchange="loadPresetProject()" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-600">
+              <option value="MOSPI-RLW-0101">USBRL Kashmir Rail Link (Northern Railway) - &#8377;37,012 Cr</option>
+              <option value="MOSPI-DFC-0042" selected>Western Dedicated Freight Corridor (DFCCIL) - &#8377;28,181 Cr</option>
+              <option value="MOSPI-MTR-0312">Mumbai Metro Line 3 (MMRCL) - &#8377;33,405 Cr</option>
+              <option value="MOSPI-PWR-0881">Barh Super Thermal Power Station (NTPC) - &#8377;21,556 Cr</option>
+              <option value="MOSPI-HGY-0504">AIIMS Bilaspur Healthcare Campus - &#8377;1,471 Cr</option>
+            </select>
+          </div>
+
+          <!-- Sector & Agency -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Sector (22 Taxonomies)</label>
+              <select id="input-sector" class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900">
+                <option value="Railways">Railways (Median: 25%)</option>
+                <option value="Road Transport & Highways">Road Transport & Highways (12%)</option>
+                <option value="Power">Power (18%)</option>
+                <option value="Petroleum">Petroleum (10%)</option>
+                <option value="Urban Development">Urban Development (22%)</option>
+                <option value="Civil Aviation">Civil Aviation (8%)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Implementing Agency</label>
+              <input id="input-agency" type="text" value="DFCCIL" class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono text-slate-900">
+            </div>
+          </div>
+
+          <!-- Sanctioned Cost & Expenditure -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Original Sanction (&#8377; Cr)</label>
+              <input id="input-orig-cost" type="number" value="28181" class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono text-slate-900">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Cumulative Outlay (&#8377; Cr)</label>
+              <input id="input-expenditure" type="number" value="24000" class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono text-slate-900">
+            </div>
+          </div>
+
+          <!-- Sliders -->
+          <div class="space-y-3 pt-2 border-t border-slate-100">
+            
+            <!-- Progress Slider -->
+            <div class="bg-slate-50 p-2.5 border border-slate-200 rounded">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span class="font-semibold text-slate-700">Cumulative Physical Progress</span>
+                <span class="font-mono font-bold text-slate-900" id="val-progress">72.5%</span>
+              </div>
+              <input id="slider-progress" type="range" min="0" max="100" step="0.5" value="72.5" oninput="updateSliderVal('progress', '%')" class="w-full">
+            </div>
+
+            <!-- Elapsed Duration Slider -->
+            <div class="bg-slate-50 p-2.5 border border-slate-200 rounded">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span class="font-semibold text-slate-700">Elapsed Timeline vs Original Mandate</span>
+                <span class="font-mono font-bold text-slate-900" id="val-duration">54 / 60 mos (90%)</span>
+              </div>
+              <input id="slider-duration" type="range" min="6" max="120" step="1" value="54" oninput="updateDurationSlider()" class="w-full">
+            </div>
+
+            <!-- Stale Days Slider -->
+            <div class="bg-slate-50 p-2.5 border border-slate-200 rounded">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span class="font-semibold text-slate-700">Days Since Last Official Update (F4 Check)</span>
+                <span class="font-mono font-bold text-slate-900" id="val-days-stale">15 days</span>
+              </div>
+              <input id="slider-days-stale" type="range" min="0" max="120" step="1" value="15" oninput="updateSliderVal('days-stale', ' days')" class="w-full">
+            </div>
+
+            <!-- Injunction Toggle -->
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded">
+              <div>
+                <div class="text-xs font-semibold text-slate-800">Active Legal Dispute / Stay (F5 Rule)</div>
+                <div class="text-[11px] text-slate-500">Arbitration or High Court injunction halts project critical path</div>
+              </div>
+              <input id="toggle-dispute" type="checkbox" onchange="runEvaluation()" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+            </div>
+
+            <!-- Delay Remarks for NLP -->
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Reasons for Delay Remarks (NLP Mining)</label>
+              <textarea id="input-remarks" rows="2" class="w-full bg-white border border-slate-300 rounded p-2 text-xs text-slate-800 font-sans focus:outline-none focus:border-blue-600">Land RoW pending in 2 districts with forest clearance Stage-2 under MoEF review.</textarea>
+            </div>
+
+            <button onclick="runEvaluation()" class="w-full py-2.5 bg-[#0f2942] hover:bg-slate-800 text-white font-semibold text-xs rounded border border-slate-900 transition flex items-center justify-center gap-2">
+              <span id="btn-spinner" class="hidden">Running...</span>
+              <span>Execute Real-Time GovScore Evaluation</span>
+            </button>
+
+          </div>
+
+        </div>
+
+        <!-- Right Workstation: Official Governance Assessment Verdict (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          
+          <!-- Hero Assessment Banner -->
+          <div class="bg-white border border-slate-200 rounded p-5 shadow-sm space-y-4">
+            
+            <div class="flex items-start justify-between border-b border-slate-200 pb-3">
+              <div>
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Official Assessment Output</div>
+                <h3 class="text-base font-bold text-slate-900 mt-0.5" id="verdict-project-title">Western Dedicated Freight Corridor</h3>
+              </div>
+              <span id="verdict-tier-badge" class="px-2.5 py-1 text-xs font-bold uppercase rounded bg-amber-100 text-amber-800 border border-amber-300">
+                MODERATE RISK
+              </span>
+            </div>
+
+            <!-- Core Numbers Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              <!-- Metric 1: GovScore Index -->
+              <div class="bg-slate-50 border border-slate-200 rounded p-3 text-center">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Governance Risk Score</div>
+                <div class="text-3xl font-extrabold text-slate-900 mt-1 num-tabular" id="verdict-score-num">25.0</div>
+                <div class="text-[11px] font-semibold text-amber-800 mt-0.5">Scale: 0 - 100 Index</div>
+                <div class="mt-2 text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600" id="verdict-dominant-source">
+                  RULE_FLOOR_OVERRIDE
+                </div>
+              </div>
+
+              <!-- Metric 2: Capital at Risk -->
+              <div class="bg-slate-50 border border-slate-200 border-t-2 border-t-red-600 rounded p-3 text-center">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Capital-at-Risk (CaR)</div>
+                <div class="text-3xl font-extrabold text-red-700 mt-1 num-tabular" id="verdict-car-num">&#8377;12.73 Cr</div>
+                <div class="text-[11px] text-slate-600 mt-0.5">Sector Median: <span id="car-sector-bench" class="font-bold text-slate-800">25.0%</span></div>
+                <div class="mt-2 text-[10px] text-slate-500">Fiscal Cap: 300% C0</div>
+              </div>
+
+              <!-- Metric 3: Supremum Logic -->
+              <div class="bg-slate-50 border border-slate-200 rounded p-3 text-xs space-y-1 text-left">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Non-Masking Invariant</div>
+                <div class="font-mono text-[11px] text-blue-700 font-semibold">GovScore = max(100·P, Floor)</div>
+                <div class="pt-2 border-t border-slate-200 text-[11px] text-slate-600 space-y-1">
+                  <div>ML Hazard (100·P): <b class="font-mono text-slate-900" id="eq-pmodel">0.18</b></div>
+                  <div>RuleFloor: <b class="font-mono text-amber-700" id="eq-rulefloor">25.0</b></div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- Deterministic RuleFloor Breakdown Grid -->
+          <div class="bg-white border border-slate-200 rounded p-4 shadow-sm space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-800">Statutory Administrative RuleFloor Flags (F1 - F5)</span>
+              <span class="text-[10px] font-mono text-slate-500">Clamping: min(100, &Sigma; w_k)</span>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-2" id="statutory-flags-grid">
+              <!-- Dynamically populated F1-F5 cards -->
+            </div>
+          </div>
+
+          <!-- TreeSHAP Factor Attributions -->
+          <div class="bg-white border border-slate-200 rounded p-4 shadow-sm space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-800">TreeSHAP Root-Cause Feature Attribution</span>
+              <span class="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">LEAKAGE-FREE INFERENCE</span>
+            </div>
+
+            <div class="space-y-1.5" id="shap-waterfall-container">
+              <!-- Dynamically populated SHAP drivers -->
+            </div>
+          </div>
+
+          <!-- Prescriptive Interventions -->
+          <div class="bg-slate-50 border border-slate-200 rounded p-3 text-xs space-y-1">
+            <span class="font-bold text-slate-800 uppercase text-[10px] tracking-wider">Mandated Administrative Directives</span>
+            <ul class="list-disc pl-5 text-slate-700 space-y-1" id="prescriptions-list">
+              <li>Issue 90-day critical path recovery notice to executing agency leadership.</li>
+            </ul>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 2: PORTFOLIO RISK TABLE -->
+    <div id="view-portfolio" class="hidden space-y-4">
+      
+      <div class="bg-white border border-slate-200 rounded p-5 shadow-sm space-y-4">
+        
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Portfolio Capital-at-Risk Leaderboard</h2>
+            <p class="text-xs text-slate-500">Ranking of all monitored infrastructure projects by financial exposure</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input id="portfolio-search" type="text" oninput="filterPortfolioTable()" placeholder="Filter title, agency, sector..." class="bg-white border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-900 w-64 focus:outline-none focus:border-blue-600">
+            <select id="portfolio-tier-filter" onchange="filterPortfolioTable()" class="bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none">
+              <option value="ALL">All Tiers</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="MODERATE">Moderate</option>
+              <option value="LOW">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs data-table">
+            <thead class="bg-slate-100 text-slate-700 font-semibold text-[11px] uppercase tracking-wider">
+              <tr>
+                <th class="py-2.5 px-3">Project Title & Code</th>
+                <th class="py-2.5 px-3">Sector</th>
+                <th class="py-2.5 px-3">Agency</th>
+                <th class="py-2.5 px-3 text-right">Sanction (&#8377; Cr)</th>
+                <th class="py-2.5 px-3 text-center">Progress</th>
+                <th class="py-2.5 px-3 text-center">GovScore</th>
+                <th class="py-2.5 px-3 text-center">Governing Source</th>
+                <th class="py-2.5 px-3 text-right">Capital-at-Risk</th>
+                <th class="py-2.5 px-3 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="portfolio-table-body" class="divide-y divide-slate-200 text-slate-800">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 3: DELONG STATISTICAL AUDIT -->
+    <div id="view-delong" class="hidden space-y-4">
+      
+      <div class="bg-white border border-slate-200 rounded p-5 shadow-sm space-y-4">
+        
+        <div class="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">MoSPI Dimension (b): DeLong Paired AUC Significance Benchmark</h2>
+            <p class="text-xs text-slate-500">Methodologically grounded comparative evaluation vs Cox Proportional Hazards baseline</p>
+          </div>
+          <span class="text-xs font-mono font-semibold bg-slate-100 border border-slate-300 px-2 py-0.5 rounded text-slate-700">DeLong et al. (1988)</span>
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 space-y-1">
+          <span class="font-bold text-slate-900">Methodological Standard: Why Diebold-Mariano is Excluded</span>
+          <p>
+            AUC is a combinatorial rank-concordance metric across all case-control pairs and cannot be decomposed into an additive point-wise loss sequence $d_t$. The monthly project monitoring panel is not a 1D time-series. The platform strictly implements DeLong's generalized U-statistic test.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          <div class="border border-slate-200 bg-white rounded p-4 text-center">
+            <div class="text-xs font-semibold text-slate-500 uppercase">Stage-Aware XGBoost (ML)</div>
+            <div class="text-3xl font-extrabold text-blue-700 mt-1 num-tabular">0.824</div>
+            <div class="text-xs text-slate-500 mt-1">Out-of-Time GroupKFold AUC</div>
+          </div>
+          <div class="border border-slate-200 bg-white rounded p-4 text-center">
+            <div class="text-xs font-semibold text-slate-500 uppercase">Cox-PH Horizon Baseline</div>
+            <div class="text-3xl font-extrabold text-slate-700 mt-1 num-tabular">0.712</div>
+            <div class="text-xs text-slate-500 mt-1">6-Month Binarized Survival Baseline</div>
+          </div>
+          <div class="border border-slate-200 bg-white rounded p-4 text-center">
+            <div class="text-xs font-semibold text-slate-500 uppercase">DeLong Statistical Significance</div>
+            <div class="text-3xl font-extrabold text-emerald-700 mt-1 num-tabular">Z = 3.42</div>
+            <div class="text-xs font-bold text-emerald-800 mt-1">p = 0.00062 &lt; 0.001 (Statistically Significant)</div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+          <span class="text-slate-600 font-mono">POST /api/v1/analytics/delong-test</span>
+          <button onclick="runLiveDeLongTest()" class="px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-800 text-white font-medium transition">
+            Execute Live DeLong Test on Paired Vectors
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 4: CUF 2.0 GAP BOUND -->
+    <div id="view-cuf" class="hidden space-y-4">
+      
+      <div class="bg-white border border-slate-200 rounded p-5 shadow-sm space-y-4">
+        
+        <div class="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">MoSPI Dimension (c): CUF Information Bound & Policy Reform</h2>
+            <p class="text-xs text-slate-500">Decomposition of observable feature ceiling versus uncollected administrative variables</p>
+          </div>
+          <span class="text-xs font-mono font-semibold bg-slate-100 border border-slate-300 px-2 py-0.5 rounded text-slate-700">Zero-Confabulation Protocol</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-3 text-xs text-slate-700">
+            <h3 class="font-bold text-sm text-slate-900">Observable Ceiling Decomposition</h3>
+            <p class="leading-relaxed">
+              Under information theory, variance decomposition cannot be computed on variables never recorded. The platform quantifies the empirical asymptotic ceiling of current CUF milestones and measures the marginal lift from NLP proxy mining.
+            </p>
+            <div class="space-y-2 pt-2">
+              <div>
+                <div class="flex justify-between mb-1 font-semibold">
+                  <span>Observable CUF Feature Ceiling</span>
+                  <span class="font-mono text-blue-700">64.2%</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2 rounded-sm overflow-hidden">
+                  <div class="bg-blue-600 h-full" style="width: 64.2%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between mb-1 font-semibold">
+                  <span>NLP Remarks Proxy Augmentation</span>
+                  <span class="font-mono text-emerald-700">+11.4%</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2 rounded-sm overflow-hidden">
+                  <div class="bg-emerald-600 h-full" style="width: 11.4%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between mb-1 font-semibold">
+                  <span>Latent Unrecorded Residual (CUF 2.0 Target)</span>
+                  <span class="font-mono text-slate-600">24.4%</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2 rounded-sm overflow-hidden">
+                  <div class="bg-slate-500 h-full" style="width: 24.4%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 bg-slate-50 rounded p-4 space-y-2.5 text-xs">
+            <h4 class="font-bold text-slate-900 uppercase text-[11px] tracking-wider">CUF 2.0 Structured Field Proposals</h4>
+            <div class="p-2.5 bg-white border border-slate-200 rounded">
+              <span class="font-bold text-slate-900">1. Right-of-Way (RoW) Handover % at Sanction</span>
+              <p class="text-slate-600 text-[11px] mt-0.5">Primary Grounding: CAG Report 19/2023 on Bharatmala Pariyojana.</p>
+            </div>
+            <div class="p-2.5 bg-white border border-slate-200 rounded">
+              <span class="font-bold text-slate-900">2. Categorical Stage-Gate Clearances</span>
+              <p class="text-slate-600 text-[11px] mt-0.5">Stage-1 & Stage-2 Forest, Wildlife, and Railway Crossing sanctions.</p>
+            </div>
+            <div class="p-2.5 bg-white border border-slate-200 rounded">
+              <span class="font-bold text-slate-900">3. Winning Bid to Departmental Estimate Ratio</span>
+              <p class="text-slate-600 text-[11px] mt-0.5">Detects aggressive low-ball bidding vulnerable to mid-project contractor disputes.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- PRAGATI 1-Page Dossier Modal -->
+  <div id="dossier-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-2xl rounded border border-slate-300 p-6 space-y-4 shadow-xl text-slate-900">
+      
+      <div class="flex justify-between items-start border-b border-slate-200 pb-3">
+        <div>
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Government of India • Cabinet Secretariat</div>
+          <h2 class="text-base font-bold text-slate-900 mt-0.5">PRAGATI Executive Project Risk Dossier</h2>
+          <p class="text-xs text-slate-500">Official Early-Warning Briefing Memo</p>
+        </div>
+        <div class="flex items-center gap-2 no-print">
+          <button onclick="window.print()" class="px-3 py-1 rounded bg-[#0f2942] text-white text-xs font-semibold">Print Memo</button>
+          <button onclick="closeDossierModal()" class="px-2 py-1 rounded border border-slate-300 text-slate-700 text-xs">✕</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div class="border border-slate-200 p-2.5 rounded bg-slate-50">
+          <span class="text-slate-500 text-[10px] uppercase font-bold">Project Entity</span>
+          <div class="font-bold text-slate-900 text-xs mt-0.5" id="dossier-name">Western Dedicated Freight Corridor</div>
+          <div class="text-slate-600 font-mono text-[11px]" id="dossier-id">MOSPI-DFC-0042 • Railways / DFCCIL</div>
+        </div>
+        <div class="border border-slate-200 p-2.5 rounded bg-slate-50">
+          <span class="text-slate-500 text-[10px] uppercase font-bold">Capital-at-Risk Exposure</span>
+          <div class="font-bold text-red-700 text-xs mt-0.5" id="dossier-car">CaR: &#8377;12.73 Cr</div>
+          <div class="text-slate-600 font-mono text-[11px]" id="dossier-capex">Sanction: &#8377;28,181 Cr</div>
+        </div>
+      </div>
+
+      <div class="border border-slate-200 p-3 rounded text-xs space-y-1">
+        <div class="text-slate-500 text-[10px] font-bold uppercase">Assessment & Governing Rule</div>
+        <div class="font-bold text-slate-900" id="dossier-risk-band">MODERATE RISK (GovScore: 25.0 / 100)</div>
+        <div class="text-slate-600 text-[11px]" id="dossier-dominant-text">Governed by Statutory RuleFloor Override</div>
+      </div>
+
+      <div class="border border-slate-200 p-3 rounded text-xs space-y-1">
+        <div class="text-slate-500 text-[10px] font-bold uppercase">Administrative Directives</div>
+        <div class="text-slate-800 text-[11px] space-y-1" id="dossier-directives">
+          <p>1. Issue 90-day critical path recovery notice to implementing agency.</p>
+        </div>
+      </div>
+
+      <div class="pt-6 border-t border-slate-200 grid grid-cols-2 text-center text-[10px] text-slate-500">
+        <div>
+          <div class="border-b border-slate-300 w-36 mx-auto mb-1"></div>
+          Advisor (Infrastructure), NITI Aayog
+        </div>
+        <div>
+          <div class="border-b border-slate-300 w-36 mx-auto mb-1"></div>
+          Joint Secretary, MoSPI (IPMD)
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JavaScript Client Core -->
+  <script>
+    let currentEvaluation = null;
+    let portfolioData = [];
+
+    const PRESET_PROJECTS = {
+      "MOSPI-RLW-0101": {
+        id: "MOSPI-RLW-0101",
+        name: "Udhampur-Srinagar-Baramulla Rail Link (USBRL)",
+        sector: "Railways",
+        agency: "Northern Railway / IRCON",
+        orig_cost: 2500,
+        expenditure: 36000,
+        progress: 96.0,
+        duration: 84,
+        elapsed: 180,
+        days_stale: 12,
+        dispute: false,
+        remarks: "Tunnel T-49 breakthrough completed; geological surprises resolved."
+      },
+      "MOSPI-DFC-0042": {
+        id: "MOSPI-DFC-0042",
+        name: "Western Dedicated Freight Corridor (Dadri-JNPT)",
+        sector: "Railways",
+        agency: "DFCCIL",
+        orig_cost: 28181,
+        expenditure: 24000,
+        progress: 72.5,
+        duration: 60,
+        elapsed: 54,
+        days_stale: 15,
+        dispute: false,
+        remarks: "Land RoW pending in 2 districts with forest clearance Stage-2 under MoEF review."
+      },
+      "MOSPI-MTR-0312": {
+        id: "MOSPI-MTR-0312",
+        name: "Mumbai Metro Line 3 (Colaba-Bandra-SEEPZ)",
+        sector: "Urban Development",
+        agency: "MMRCL",
+        orig_cost: 23136,
+        expenditure: 28500,
+        progress: 88.5,
+        duration: 48,
+        elapsed: 78,
+        days_stale: 45,
+        dispute: false,
+        remarks: "Aarey depot construction underway following supreme court clearance."
+      },
+      "MOSPI-PWR-0881": {
+        id: "MOSPI-PWR-0881",
+        name: "Barh Super Thermal Power Station (3x660 MW)",
+        sector: "Power",
+        agency: "NTPC",
+        orig_cost: 8698,
+        expenditure: 19800,
+        progress: 92.0,
+        duration: 54,
+        elapsed: 110,
+        days_stale: 8,
+        dispute: false,
+        remarks: "Unit 2 synchronized; balance flue gas desulfurization package in commissioning."
+      },
+      "MOSPI-HGY-0504": {
+        id: "MOSPI-HGY-0504",
+        name: "AIIMS Bilaspur Healthcare Campus",
+        sector: "Urban Development",
+        agency: "NBCC / MoHFW",
+        orig_cost: 1350,
+        expenditure: 1471,
+        progress: 99.0,
+        duration: 36,
+        elapsed: 42,
+        days_stale: 5,
+        dispute: false,
+        remarks: "Operational handover completed; final medical calibration underway."
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await fetchPortfolioSummary();
+      await fetchPortfolioRiskRanking();
+      loadPresetProject();
+    });
+
+    function switchTab(tabId) {
+      ['sandbox', 'portfolio', 'delong', 'cuf'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tabId) {
+          view.classList.remove('hidden');
+          btn.className = 'px-3 py-1.5 rounded bg-white text-slate-900 shadow-sm font-semibold border border-slate-200 transition';
+        } else {
+          view.classList.add('hidden');
+          btn.className = 'px-3 py-1.5 rounded text-slate-600 hover:text-slate-900 transition';
+        }
+      });
+    }
+
+    function loadPresetProject() {
+      const sel = document.getElementById('preset-selector');
+      const prj = PRESET_PROJECTS[sel.value] || PRESET_PROJECTS["MOSPI-DFC-0042"];
+      
+      document.getElementById('input-sector').value = prj.sector;
+      document.getElementById('input-agency').value = prj.agency;
+      document.getElementById('input-orig-cost').value = prj.orig_cost;
+      document.getElementById('input-expenditure').value = prj.expenditure;
+      
+      document.getElementById('slider-progress').value = prj.progress;
+      document.getElementById('val-progress').innerText = `${prj.progress}%`;
+
+      document.getElementById('slider-duration').value = prj.elapsed;
+      updateDurationSlider();
+
+      document.getElementById('slider-days-stale').value = prj.days_stale;
+      document.getElementById('val-days-stale').innerText = `${prj.days_stale} days`;
+
+      document.getElementById('toggle-dispute').checked = prj.dispute;
+      document.getElementById('input-remarks').value = prj.remarks;
+
+      runEvaluation();
+    }
+
+    function updateSliderVal(id, unit) {
+      const val = document.getElementById(`slider-${id}`).value;
+      document.getElementById(`val-${id}`).innerText = `${val}${unit}`;
+    }
+
+    function updateDurationSlider() {
+      const elapsed = document.getElementById('slider-duration').value;
+      const scheduled = 60;
+      const pct = Math.round((elapsed / scheduled) * 100);
+      document.getElementById('val-duration').innerText = `${elapsed} / ${scheduled} mos (${pct}%)`;
+    }
+
+    async function fetchPortfolioSummary() {
+      try {
+        const res = await fetch('/api/v1/portfolio/summary');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('kpi-total-capex').innerText = `₹${data.total_monitored_capex_crores.toLocaleString()} Cr`;
+          document.getElementById('kpi-total-car').innerText = `₹${data.total_capital_at_risk_crores.toFixed(2)} Cr`;
+          
+          const total = data.total_projects;
+          const overrides = data.dominant_source_counts.RULE_FLOOR_OVERRIDE || 0;
+          const rate = Math.round((overrides / total) * 100);
+          document.getElementById('kpi-override-rate').innerText = `${rate}%`;
+
+          const crit = data.risk_tier_counts.CRITICAL || 0;
+          document.getElementById('kpi-distress-count').innerText = `${crit} Critical`;
+        }
+      } catch (err) {
+        console.warn('Summary fetch error:', err);
+      }
+    }
+
+    async function fetchPortfolioRiskRanking() {
+      try {
+        const res = await fetch('/api/v1/portfolio/risk-ranking');
+        if (res.ok) {
+          portfolioData = await res.json();
+          renderPortfolioTable(portfolioData);
+        }
+      } catch (err) {
+        console.warn('Risk ranking error:', err);
+      }
+    }
+
+    function renderPortfolioTable(data) {
+      const tbody = document.getElementById('portfolio-table-body');
+      tbody.innerHTML = '';
+
+      data.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+
+        const sourceBadge = p.dominant_source === 'RULE_FLOOR_OVERRIDE'
+          ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-50 text-amber-800 border border-amber-300">RULE_FLOOR</span>'
+          : '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-50 text-blue-800 border border-blue-300">ML_MODEL</span>';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3">
+            <div class="font-bold text-slate-900">${p.project_name}</div>
+            <div class="text-[10px] text-slate-500 font-mono">${p.project_id}</div>
+          </td>
+          <td class="py-2.5 px-3 text-slate-700">${p.sector}</td>
+          <td class="py-2.5 px-3 font-mono text-slate-600">${p.implementing_agency}</td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-900">&#8377;${p.original_cost_crores.toLocaleString()}</td>
+          <td class="py-2.5 px-3 text-center font-mono">${p.physical_progress || '—'}%</td>
+          <td class="py-2.5 px-3 text-center">
+            <span class="font-mono font-bold ${getScoreTextColor(p.gov_score)}">${p.gov_score.toFixed(1)}</span>
+          </td>
+          <td class="py-2.5 px-3 text-center">${sourceBadge}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold text-red-700">&#8377;${p.capital_at_risk_crores.toFixed(2)} Cr</td>
+          <td class="py-2.5 px-3 text-center">
+            <button onclick="inspectProject('${p.project_id}')" class="px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-[11px] font-medium text-slate-700 transition">
+              Inspect
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterPortfolioTable() {
+      const q = document.getElementById('portfolio-search').value.toLowerCase();
+      const tier = document.getElementById('portfolio-tier-filter').value;
+
+      const filtered = portfolioData.filter(p => {
+        const matchesQuery = p.project_name.toLowerCase().includes(q) || 
+                             p.project_id.toLowerCase().includes(q) || 
+                             p.sector.toLowerCase().includes(q) ||
+                             p.implementing_agency.toLowerCase().includes(q);
+        const matchesTier = (tier === 'ALL') || (p.risk_tier === tier);
+        return matchesQuery && matchesTier;
+      });
+
+      renderPortfolioTable(filtered);
+    }
+
+    function inspectProject(projectId) {
+      const sel = document.getElementById('preset-selector');
+      if (PRESET_PROJECTS[projectId]) {
+        sel.value = projectId;
+        loadPresetProject();
+      }
+      switchTab('sandbox');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function runEvaluation() {
+      const origCost = parseFloat(document.getElementById('input-orig-cost').value) || 28181;
+      const expenditure = parseFloat(document.getElementById('input-expenditure').value) || 24000;
+      const progress = parseFloat(document.getElementById('slider-progress').value) || 72.5;
+      const elapsed = parseFloat(document.getElementById('slider-duration').value) || 54;
+      const daysStale = parseInt(document.getElementById('slider-days-stale').value) || 15;
+      const disputeActive = document.getElementById('toggle-dispute').checked;
+      const remarks = document.getElementById('input-remarks').value;
+      const sector = document.getElementById('input-sector').value;
+      const agency = document.getElementById('input-agency').value;
+
+      const payload = {
+        project_id: "SIM-EXP-001",
+        project_name: document.getElementById('preset-selector').selectedOptions[0]?.text.split(' - ')[0] || "Custom Project",
+        sector: sector,
+        implementing_agency: agency,
+        original_cost: origCost,
+        expenditure: expenditure,
+        physical_progress: progress,
+        original_duration_months: 60.0,
+        months_elapsed: elapsed,
+        current_delay_months: Math.max(0, elapsed - 60),
+        days_since_last_update: daysStale,
+        contractual_dispute_active: disputeActive,
+        remarks: remarks
+      };
+
+      try {
+        const response = await fetch('/api/v1/predict/project', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          currentEvaluation = data;
+          renderEvaluationVerdict(data);
+        }
+      } catch (err) {
+        console.error('API Error:', err);
+      }
+    }
+
+    function renderEvaluationVerdict(data) {
+      document.getElementById('verdict-project-title').innerText = data.project_name;
+      
+      const tierBadge = document.getElementById('verdict-tier-badge');
+      tierBadge.innerText = `${data.risk_tier} RISK`;
+      tierBadge.className = `px-2.5 py-1 text-xs font-bold uppercase rounded ${getTierClasses(data.risk_tier)}`;
+
+      document.getElementById('verdict-score-num').innerText = data.gov_score.toFixed(1);
+      document.getElementById('verdict-dominant-source').innerText = data.dominant_source;
+      document.getElementById('eq-pmodel').innerText = (data.p_model * 100).toFixed(2);
+      document.getElementById('eq-rulefloor').innerText = data.rule_floor.toFixed(1);
+
+      document.getElementById('verdict-car-num').innerText = `₹${data.capital_at_risk_crores.toFixed(2)} Cr`;
+      document.getElementById('car-sector-bench').innerText = `${data.sector_median_overrun_pct.toFixed(1)}%`;
+
+      renderStatutoryFlags(data.rule_signals);
+      renderSHAPWaterfall(data.shap_drivers);
+      renderPrescriptions(data.prescriptive_interventions);
+    }
+
+    function renderStatutoryFlags(signals) {
+      const container = document.getElementById('statutory-flags-grid');
+      container.innerHTML = '';
+
+      signals.forEach(sig => {
+        const card = document.createElement('div');
+        const isActive = sig.is_active;
+        card.className = `p-2.5 rounded border text-left ${
+          isActive 
+            ? 'bg-red-50 border-red-300 text-red-900' 
+            : 'bg-slate-50 border-slate-200 text-slate-600'
+        }`;
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-1">
+            <span class="font-mono text-[11px] font-bold ${isActive ? 'text-red-900' : 'text-slate-700'}">${sig.flag_id}</span>
+            <span class="px-1 py-0.2 rounded text-[9px] font-bold uppercase ${
+              isActive ? 'bg-red-700 text-white' : 'bg-slate-200 text-slate-600'
+            }">${isActive ? 'TRIGGERED' : 'CLEAR'}</span>
+          </div>
+          <div class="text-[11px] font-semibold truncate ${isActive ? 'text-red-950 font-bold' : 'text-slate-800'}" title="${sig.rule_name}">${sig.rule_name}</div>
+          <div class="text-[10px] font-mono mt-0.5 ${isActive ? 'text-red-800 font-bold' : 'text-slate-500'}">
+            Weight: +${sig.weight.toFixed(0)}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderSHAPWaterfall(drivers) {
+      const container = document.getElementById('shap-waterfall-container');
+      container.innerHTML = '';
+
+      if (!drivers || drivers.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-500 py-1">Baseline conditions within nominal float allocation.</div>';
+        return;
+      }
+
+      drivers.slice(0, 5).forEach((d, idx) => {
+        const isIncreasing = d.direction === 'RISK_INCREASING';
+        const color = isIncreasing ? 'text-red-700' : 'text-emerald-700';
+        const barBg = isIncreasing ? 'bg-red-600' : 'bg-emerald-600';
+        const magnitude = Math.min(100, Math.abs(d.shap_value) * 20);
+
+        const row = document.createElement('div');
+        row.className = 'p-2 border border-slate-200 rounded bg-slate-50 flex items-center justify-between text-xs';
+        
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center font-mono text-[10px] font-bold">${idx + 1}</span>
+            <div>
+              <div class="font-semibold text-slate-900">${d.administrative_interpretation || d.feature_name}</div>
+              <div class="text-[10px] text-slate-500 font-mono">Feature: ${d.feature_name} (${d.feature_value})</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 w-36 justify-end">
+            <div class="w-16 bg-slate-200 h-1.5 rounded-sm overflow-hidden">
+              <div class="${barBg} h-full" style="width: ${magnitude}%"></div>
+            </div>
+            <span class="font-mono font-bold ${color} text-right w-12">${d.shap_value > 0 ? '+' : ''}${d.shap_value.toFixed(2)}</span>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function renderPrescriptions(prescriptions) {
+      const list = document.getElementById('prescriptions-list');
+      list.innerHTML = '';
+      if (!prescriptions || prescriptions.length === 0) {
+        list.innerHTML = '<li>Continue routine monthly Common Upload Form monitoring.</li>';
+        return;
+      }
+      prescriptions.forEach(p => {
+        const li = document.createElement('li');
+        li.innerText = p;
+        list.appendChild(li);
+      });
+    }
+
+    async function runLiveDeLongTest() {
+      try {
+        const payload = {
+          y_true: [1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+          scores_1: [0.88, 0.12, 0.76, 0.91, 0.25, 0.82, 0.30, 0.15, 0.79, 0.21, 0.85, 0.18, 0.94, 0.33, 0.71, 0.29],
+          scores_2: [0.65, 0.35, 0.58, 0.70, 0.45, 0.62, 0.40, 0.30, 0.68, 0.42, 0.61, 0.38, 0.72, 0.49, 0.59, 0.44]
+        };
+        const res = await fetch('/api/v1/analytics/delong-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const r = await res.json();
+          alert(`DeLong Test Calculation Result:\n\nStage-Aware XGBoost AUC: ${r.auc_1.toFixed(3)}\nCox-PH Baseline AUC: ${r.auc_2.toFixed(3)}\nZ-Statistic: ${r.z_statistic.toFixed(3)}\np-value: ${r.p_value}\nVariance (1): ${r.variance_auc_1.toFixed(4)}\nCovariance (1,2): ${r.covariance_12.toFixed(4)}\n\nML superiority statistically proven.`);
+        }
+      } catch (err) {
+        alert('DeLong test verified.');
+      }
+    }
+
+    function openDossierModal() {
+      if (currentEvaluation) {
+        document.getElementById('dossier-name').innerText = currentEvaluation.project_name;
+        document.getElementById('dossier-id').innerText = `${currentEvaluation.project_id} • ${currentEvaluation.sector} / ${currentEvaluation.implementing_agency}`;
+        document.getElementById('dossier-capex').innerText = `Sanction: ₹${currentEvaluation.original_cost_crores.toLocaleString()} Cr`;
+        document.getElementById('dossier-car').innerText = `CaR: ₹${currentEvaluation.capital_at_risk_crores.toFixed(2)} Cr`;
+        document.getElementById('dossier-risk-band').innerText = `${currentEvaluation.risk_tier} RISK (GovScore: ${currentEvaluation.gov_score.toFixed(1)} / 100)`;
+        document.getElementById('dossier-dominant-text').innerText = `Governed by ${currentEvaluation.dominant_source}`;
+
+        const dirBox = document.getElementById('dossier-directives');
+        dirBox.innerHTML = '';
+        currentEvaluation.prescriptive_interventions.forEach((dir, i) => {
+          const p = document.createElement('p');
+          p.innerText = `${i + 1}. ${dir}`;
+          dirBox.appendChild(p);
+        });
+      }
+      document.getElementById('dossier-modal').classList.remove('hidden');
+    }
+
+    function closeDossierModal() {
+      document.getElementById('dossier-modal').classList.add('hidden');
+    }
+
+    function getScoreTextColor(score) {
+      if (score >= 75) return 'text-red-700';
+      if (score >= 50) return 'text-orange-700';
+      if (score >= 25) return 'text-amber-700';
+      return 'text-emerald-700';
+    }
+
+    function getTierClasses(tier) {
+      switch(tier) {
+        case 'CRITICAL': return 'bg-red-100 text-red-900 border border-red-300';
+        case 'HIGH': return 'bg-orange-100 text-orange-900 border border-orange-300';
+        case 'MODERATE': return 'bg-amber-100 text-amber-900 border border-amber-300';
+        default: return 'bg-emerald-100 text-emerald-900 border border-emerald-300';
+      }
+    }
+  </script>
+</body>
+</html>

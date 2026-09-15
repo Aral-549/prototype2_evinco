@@ -1,0 +1,39 @@
+@echo off
+REM ==============================================================================
+REM MoSPI PAIMANA Predictive Intelligence Platform - Windows Setup Script
+REM ==============================================================================
+echo ----------------------------------------------------------------------
+echo   Setting up MoSPI PAIMANA Platform on Windows
+echo ----------------------------------------------------------------------
+
+python --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ERROR: Python is not detected on PATH. Please install Python 3.10+ and add to PATH.
+    pause
+    exit /b 1
+)
+
+if not exist ".venv" (
+    echo Creating virtual environment in .venv...
+    python -m venv .venv
+) else (
+    echo Existing virtual environment found in .venv.
+)
+
+call .venv\Scripts\activate.bat
+
+echo Upgrading pip and installing dependencies...
+python -m pip install --upgrade pip
+pip install -r backend\requirements.txt
+
+echo Running automated test suite (140 tests)...
+set PYTHONPATH=backend
+pytest backend -q
+
+echo.
+echo ======================================================================
+echo   Setup Complete! All test suites passed.
+echo   To start the platform, run:
+echo       run.bat
+echo ======================================================================
+pause

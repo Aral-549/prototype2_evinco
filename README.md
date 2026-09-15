@@ -157,11 +157,12 @@ Once the server is running on `http://localhost:8000`:
 
 ## Running Automated Tests
 
-All tests are self-contained and run in under 3 seconds without needing external databases or Redis:
+All tests are self-contained and run in under 3 seconds without needing external databases or Redis (ensure your virtual environment is activated via `source .venv/bin/activate` or `.venv\Scripts\activate` on Windows):
 
 ```bash
 # Run the complete test suite (140 tests):
 PYTHONPATH=backend pytest backend -q
+# (or: .venv/bin/pytest backend -q)
 
 # Or run tests for specific modules:
 pytest backend/tests/test_paimana_engine.py      # GovScore & RuleFloor override invariants

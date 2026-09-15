@@ -35,6 +35,21 @@ def _resolve_frontend_dir() -> Path:
     return candidates[0]
 
 
+def _resolve_real_data_path() -> Path:
+    env_path = os.getenv("REAL_DATA_PATH")
+    if env_path and Path(env_path).exists():
+        return Path(env_path)
+    candidates = [
+        Path(__file__).resolve().parent.parent.parent / "data" / "paimana_real_projects.json",
+        Path(__file__).resolve().parent.parent / "data" / "paimana_real_projects.json",
+        Path(__file__).resolve().parent / "data" / "paimana_real_projects.json",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
+
+
 class Settings(BaseModel):
     PROJECT_NAME: str = "MoSPI PAIMANA Predictive Intelligence API"
     VERSION: str = "1.0.0"
@@ -44,6 +59,7 @@ class Settings(BaseModel):
     BASE_DIR: Path = Field(default_factory=lambda: Path(__file__).resolve().parent.parent)
     MODEL_PATH: Path = Field(default_factory=_resolve_model_path)
     FRONTEND_DIR: Path = Field(default_factory=_resolve_frontend_dir)
+    REAL_DATA_PATH: Path = Field(default_factory=_resolve_real_data_path)
     
     # Server configuration
     HOST: str = os.getenv("HOST", "0.0.0.0")

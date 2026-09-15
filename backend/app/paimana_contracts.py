@@ -48,8 +48,8 @@ class ProjectInput(BaseModel):
     )
     project_name: str = Field(
         ...,
-        min_length=3,
-        max_length=256,
+        min_length=1,
+        max_length=512,
         description="Official sanctioned title of the infrastructure project",
         examples=["Western Dedicated Freight Corridor (Dadri to JNPT)"],
     )

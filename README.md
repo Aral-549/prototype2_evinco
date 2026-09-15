@@ -64,13 +64,17 @@ Everything is cleanly decoupled so team members can work on frontend, backend, o
 ├── backend/                   # FastAPI backend service
 │   ├── app/
 │   │   ├── api/v1/endpoints/  # REST routes (predict, health, portfolio, analytics)
-│   │   ├── services/          # Core inference, governance engine, mock data
+│   │   ├── services/          # Real data loader, inference, governance engine, CSV ingest
 │   │   ├── paimana_*.py       # Math logic: RuleFloor, CaR, TreeSHAP, DeLong stats
-│   │   ├── config.py          # Auto-resolves paths for model and frontend
+│   │   ├── config.py          # Auto-resolves paths for model, data, and frontend
 │   │   └── main.py            # API entrypoint & dashboard route
-│   ├── tests/                 # 140 automated test cases (100% pass)
+│   ├── tests/                 # 148 automated test cases (100% pass)
 │   ├── requirements.txt       # Python dependencies
 │   └── pytest.ini             # Test runner configuration
+│
+├── data/                      # Harvested real MoSPI PAIMANA infrastructure dataset
+│   ├── paimana_real_projects.json  # 2,155 normalized projects (₹41.85 lakh crore capex)
+│   └── paimana_real_projects.csv   # Flat CSV format for tabular analysis & batch scoring
 │
 ├── frontend/                  # Institutional light-mode dashboard
 │   ├── index.html             # High-density daylight command center (no build step needed)
@@ -79,6 +83,9 @@ Everything is cleanly decoupled so team members can work on frontend, backend, o
 ├── model/                     # Trained machine learning assets
 │   ├── paimana_schedule_risk_xgboost.pkl  # Serialized XGBoost model
 │   └── README.md              # Model Card & feature dictionary
+│
+├── scripts/                   # Data engineering & harvest utilities
+│   └── download_real_paimana_data.py  # Live harvester from https://paimana-proj.mospi.gov.in/
 │
 ├── docs/                      # Technical specifications
 │   └── MASTER_SPECIFICATION.md # Comprehensive 105KB architectural blueprint
@@ -155,21 +162,33 @@ Once the server is running on `http://localhost:8000`:
 
 ---
 
+## Live MoSPI PAIMANA Dataset (Zero-Mock Testing)
+
+Rather than evaluating the system on synthetic or mocked toy records, the platform operates directly on **genuine government data downloaded from the official MoSPI portal**:
+- **Official Source URL:** [https://paimana-proj.mospi.gov.in/](https://paimana-proj.mospi.gov.in/) (explicitly cited in Problem Statement SIH26103)
+- **Monitored Scale:** **2,155 unique central infrastructure projects** (harvested across 14,917 longitudinal monthly monitoring snapshots)
+- **Aggregated Capex:** **₹41,84,701.00 Crore** (₹41.85 lakh crore, aligning with the ₹37.13–42.78 lakh crore cited in the official problem statement)
+- **Sectoral Coverage:** All 26 central infrastructure sectors (Roads & Highways, Railways, Power, Coal, Petroleum, Aviation, Steel, Urban Transport, etc.) across all 36 States/UTs.
+- **Data Engineering Utility:** Run `python scripts/download_real_paimana_data.py` at any time to re-query the live portal and update `data/paimana_real_projects.json` and `data/paimana_real_projects.csv`.
+
+---
+
 ## Running Automated Tests
 
-All tests are self-contained and run in under 3 seconds without needing external databases or Redis (ensure your virtual environment is activated via `source .venv/bin/activate` or `.venv\Scripts\activate` on Windows):
+All tests are self-contained and run without needing external databases or Redis (ensure your virtual environment is activated via `source .venv/bin/activate` or `.venv\Scripts\activate` on Windows):
 
 ```bash
-# Run the complete test suite (140 tests):
+# Run the complete test suite (148 tests including real data validation):
 PYTHONPATH=backend pytest backend -q
 # (or: .venv/bin/pytest backend -q)
 
 # Or run tests for specific modules:
+pytest backend/tests/test_real_paimana_data.py   # Full validation against 2,155 real government projects
 pytest backend/tests/test_paimana_engine.py      # GovScore & RuleFloor override invariants
 pytest backend/tests/test_paimana_car.py         # Capital-at-Risk & sector medians
 pytest backend/tests/test_paimana_rules.py       # F1 through F5 statutory trigger conditions
 pytest backend/tests/test_paimana_statistics.py  # DeLong paired covariance formulas
-pytest backend/tests/test_endpoints.py           # REST endpoints and leakage quarantine
+pytest backend/tests/test_endpoints.py           # REST endpoints and portfolio leaderboard
 ```
 
-**Test Status:** `140 passed in 2.30s (100% green)`
+**Test Status:** `148 passed in 7.40s (100% green)`

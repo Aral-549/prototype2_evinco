@@ -7,16 +7,16 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.paimana_contracts import ProjectGovernanceAssessment
 from app.schemas.analytics import PortfolioSummaryResponse, SectorRiskAggregation
-from app.services.governance_service import ModelNotLoadedError, evaluate_project
-from app.services.mock_data import MOCK_PAIMANA_PROJECTS
+from app.services.governance_service import ModelNotLoadedError
+from app.services.real_data import get_evaluated_portfolio, load_real_projects
 
 router = APIRouter()
 
 
-def _evaluate_all_mock_projects() -> List[ProjectGovernanceAssessment]:
-    """Helper to evaluate all registered infrastructure projects."""
+def _get_all_evaluated_projects() -> List[ProjectGovernanceAssessment]:
+    """Helper to evaluate all registered infrastructure projects from real dataset."""
     try:
-        return [evaluate_project(p, include_drivers=False) for p in MOCK_PAIMANA_PROJECTS]
+        return get_evaluated_portfolio()
     except ModelNotLoadedError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -33,13 +33,14 @@ def get_portfolio_summary() -> PortfolioSummaryResponse:
     - Aggregate Capital-at-Risk (CaR)
     - Sectoral distribution and Critical/High-risk concentrations
     """
-    evaluated = _evaluate_all_mock_projects()
+    evaluated = _get_all_evaluated_projects()
+    raw_projects = load_real_projects()
 
     total_capex = sum(p.original_cost_crores for p in evaluated)
     total_expenditure = 0.0
     # NOTE: expenditure is carried on the CUF input, not on the assessment;
     # recompute from the seed inputs for the expenditure aggregate.
-    input_by_id = {p.project_id: p for p in MOCK_PAIMANA_PROJECTS}
+    input_by_id = {p.project_id: p for p in raw_projects}
     for p in evaluated:
         src = input_by_id.get(p.project_id)
         if src is not None:
@@ -103,12 +104,18 @@ def get_risk_ranking(
         default=None,
         description="Optional risk tier filter ('LOW', 'MODERATE', 'HIGH', 'CRITICAL')",
     ),
+    limit: Optional[int] = Query(
+        default=None,
+        ge=1,
+        le=5000,
+        description="Optional maximum number of projects to return",
+    ),
 ) -> List[ProjectGovernanceAssessment]:
     """
     Returns individual monitored infrastructure projects sorted by Capital-at-Risk (CaR).
     Directly serves the executive early-warning priority view for administrators.
     """
-    evaluated = _evaluate_all_mock_projects()
+    evaluated = list(_get_all_evaluated_projects())
 
     if sector:
         evaluated = [p for p in evaluated if p.sector.lower() == sector.lower()]
@@ -117,4 +124,6 @@ def get_risk_ranking(
 
     # Sort descending by CaR
     evaluated.sort(key=lambda p: p.capital_at_risk_crores, reverse=True)
+    if limit is not None:
+        evaluated = evaluated[:limit]
     return evaluated

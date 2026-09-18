@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, NotMeasuredError, type LeadTime, type ModelMetrics } from "@/lib/api";
+import { api, NotMeasuredError, type LeadTime, type ModelMetrics, type OrderingSensitivity, type LabelValidity } from "@/lib/api";
 import { count, humanise, percent } from "@/lib/format";
 import {
   NotMeasured,
@@ -25,6 +25,8 @@ const MODEL_ORDER = ["xgboost", "logit", "dtph", "deadline_continuous", "ruleflo
 export default function EvidencePage() {
   const [metrics, setMetrics] = useState<ModelMetrics | null>(null);
   const [lead, setLead] = useState<LeadTime | null>(null);
+  const [ordering, setOrdering] = useState<OrderingSensitivity | null>(null);
+  const [validity, setValidity] = useState<LabelValidity | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,6 +41,8 @@ export default function EvidencePage() {
         ),
       );
     api.leadTime().then(setLead).catch(() => undefined);
+    api.orderingSensitivity().then(setOrdering).catch(() => undefined);
+    api.labelValidity().then(setValidity).catch(() => undefined);
   }, []);
 
   const h1 = metrics?.horizons?.["1m"];
@@ -264,6 +268,140 @@ export default function EvidencePage() {
                 cannot be observed.
               </p>
             </Surface>
+          </section>
+        ) : null}
+
+        {/* DeLong Paired Tests */}
+        {primary?.delong_tests?.length ? (
+          <section className="mt-12">
+            <SectionHeader>DeLong paired tests</SectionHeader>
+            <Surface padded={false}>
+              {primary.delong_tests.map((test, i) => {
+                const significant = (test.p_value ?? 1) < 0.05;
+                return (
+                  <div key={test.comparison}>
+                    {i > 0 ? <Separator className="ml-5" /> : null}
+                    <div className={cn("flex items-center gap-4 px-5 py-3.5", significant && "bg-accent-wash")}>
+                      <div className="min-w-0 flex-1">
+                        <div className={cn("t-subhead truncate", significant ? "font-semibold text-accent" : "")}>
+                          {test.comparison}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="tabular t-subhead text-fg-secondary">
+                          {test.auc_delta !== undefined ? (test.auc_delta > 0 ? "+" : "") + test.auc_delta.toFixed(4) : "—"}
+                        </div>
+                        <div className="t-caption text-fg-tertiary">Δ AUC</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="tabular t-subhead text-fg-secondary">
+                          {test.z_statistic !== undefined ? test.z_statistic.toFixed(3) : "—"}
+                        </div>
+                        <div className="t-caption text-fg-tertiary">Z-stat</div>
+                      </div>
+                      <div className="w-16 shrink-0 text-right">
+                        <div className={cn("tabular t-subhead", significant ? "font-semibold text-accent" : "text-fg-secondary")}>
+                          {test.p_value !== undefined ? test.p_value.toFixed(4) : "—"}
+                        </div>
+                        <div className="t-caption text-fg-tertiary">p-value</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </Surface>
+          </section>
+        ) : null}
+
+        {/* Calibration */}
+        {h1?.calibration ? (
+          <section className="mt-12">
+            <SectionHeader trailing={h1.calibration.method}>Calibration</SectionHeader>
+            <Surface>
+              <div className="flex flex-wrap items-end gap-x-10 gap-y-5">
+                <div>
+                  <div className="t-section">ECE before</div>
+                  <div className="tabular t-title-2 mt-1">
+                    {h1.calibration.ece_before.toFixed(4)}
+                  </div>
+                </div>
+                <div>
+                  <div className="t-section">ECE after cross-fitting</div>
+                  <div className="tabular t-title-2 mt-1 text-accent">
+                    {h1.calibration.ece_after_cross_fitted.toFixed(4)}
+                  </div>
+                </div>
+              </div>
+            </Surface>
+          </section>
+        ) : null}
+
+        {/* Ordering Sensitivity */}
+        {ordering ? (
+          <section className="mt-12">
+            <SectionHeader>Ordering sensitivity</SectionHeader>
+            <Surface padded={false}>
+              {ordering.rules.map((rule, i) => (
+                <div key={rule.ordering_rule}>
+                  {i > 0 ? <Separator className="ml-5" /> : null}
+                  <div className={cn("flex items-center gap-4 px-5 py-3.5", rule.is_negative_control && "bg-critical-wash")}>
+                    <div className="min-w-0 flex-1">
+                      <div className={cn("t-subhead truncate", rule.is_negative_control ? "text-critical font-semibold" : "")}>
+                        {rule.ordering_rule}
+                      </div>
+                      <div className="t-caption text-fg-tertiary truncate">
+                        {rule.description}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="tabular t-subhead font-semibold text-fg-secondary">
+                        {rule.auc_1m.toFixed(3)}
+                      </div>
+                      <div className="t-caption text-fg-tertiary">AUC (1m)</div>
+                    </div>
+                    <div className="w-24 shrink-0 text-right">
+                      <div className={cn("t-subhead", rule.is_negative_control ? "text-critical" : "text-fg-secondary")}>
+                        {rule.is_negative_control ? "Yes" : "No"}
+                      </div>
+                      <div className="t-caption text-fg-tertiary">Neg. control</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </Surface>
+            <p className="t-footnote mt-3 max-w-prose text-fg-secondary">{ordering.stability_verdict}</p>
+          </section>
+        ) : null}
+
+        {/* Label Validity */}
+        {validity ? (
+          <section className="mt-12">
+            <SectionHeader>Label validity</SectionHeader>
+            <Surface padded={false}>
+              {validity.bands.map((band, i) => (
+                <div key={band.band}>
+                  {i > 0 ? <Separator className="ml-5" /> : null}
+                  <div className="flex items-center gap-4 px-5 py-3.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="t-subhead truncate">{band.band}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="tabular t-subhead text-fg-secondary">
+                        {count(band.n)}
+                      </div>
+                      <div className="t-caption text-fg-tertiary">n</div>
+                    </div>
+                    <div className="w-16 shrink-0 text-right">
+                      <div className="tabular t-subhead font-semibold text-accent">
+                        {percent(band.slip_rate * 100, 1)}
+                      </div>
+                      <div className="t-caption text-fg-tertiary">slip rate</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </Surface>
+            <p className="t-footnote mt-3 max-w-prose text-fg-secondary">{validity.verdict}</p>
           </section>
         ) : null}
       </main>

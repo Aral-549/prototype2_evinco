@@ -251,6 +251,22 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(project),
     }),
+
+  orderingSensitivity: () =>
+    get<OrderingSensitivity>("/api/v1/analytics/ordering-sensitivity"),
+
+  labelValidity: () =>
+    get<LabelValidity>("/api/v1/analytics/label-validity"),
+
+  cufGap: () =>
+    get<CufGap>("/api/v1/analytics/cuf-gap"),
+
+  delongTest: (payload: DelongTestInput) =>
+    get<DelongTestResult>("/api/v1/analytics/delong-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
 };
 
 /** Full assessment plus horizon curve for one monitored project. */
@@ -259,4 +275,53 @@ export interface ProjectDetail {
   horizons: Record<string, HorizonEntry>;
   horizon_definitions: Record<string, string>;
   feature_approximations: Record<string, string>;
+}
+
+/* ── New endpoint types for Simulator / Audit / CUF-Gap pages ───────── */
+
+export interface OrderingSensitivity {
+  rules: Array<{
+    ordering_rule: string;
+    description: string;
+    auc_1m: number;
+    auc_3m?: number;
+    auc_6m?: number;
+    is_negative_control: boolean;
+  }>;
+  stability_verdict: string;
+}
+
+export interface LabelValidity {
+  bands: Array<{
+    band: string;
+    n: number;
+    slip_rate: number;
+  }>;
+  verdict: string;
+}
+
+export interface CufGap {
+  discriminative_auc_ceiling: number;
+  observable_ceiling_provenance: string;
+  methodology_statement: string;
+  nlp_augmentation: {
+    auc_delta: number;
+    proxy_names: string[];
+    note: string;
+  };
+}
+
+export interface DelongTestInput {
+  y_true: number[];
+  scores_1: number[];
+  scores_2: number[];
+}
+
+export interface DelongTestResult {
+  auc_1: number;
+  auc_2: number;
+  z_statistic: number;
+  p_value: number;
+  variance_auc_1: number;
+  covariance_12: number;
 }

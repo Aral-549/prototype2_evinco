@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Overview" },
+  { href: "/simulator", label: "Simulator" },
   { href: "/evidence", label: "Evidence" },
+  { href: "/cuf-gap", label: "CUF 2.0" },
 ];
 
 /**

@@ -83,6 +83,7 @@ if settings.FRONTEND_DIR.exists():
     )
 
 
+@app.get("/paimana", summary="Executive Command Center", response_class=HTMLResponse, tags=["Frontend"])
 @app.get("/dashboard", summary="Executive Command Center", response_class=HTMLResponse, tags=["Frontend"])
 def get_dashboard() -> HTMLResponse:
     """Serves the Executive UI/UX Dashboard."""

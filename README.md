@@ -10,13 +10,14 @@
 
 The platform is deployed live on an Azure cloud instance with SSL encryption and full mobile/desktop responsiveness:
 
-* **Executive Decision-Support Platform:** [https://evinco-sih.centralindia.cloudapp.azure.com/paimana](https://evinco-sih.centralindia.cloudapp.azure.com/paimana) (also accessible at [/dashboard](https://evinco-sih.centralindia.cloudapp.azure.com/dashboard))
-  * **Interactive What-If Sandbox:** Real-time risk scoring, multi-horizon slip curves, statutory rule flags, and TreeSHAP root-cause attributions.
-  * **Portfolio Risk Leaderboard:** Ranked project inventory across ₹41+ lakh crore with search, sector filtering, and Capital-at-Risk sorting.
-  * **DeLong Statistical Audit:** Empirical proof that machine learning beats classical statistics ($p < 10^{-15}$) across 11,531 observed transitions.
-  * **CUF 2.0 Information Bound:** Observable feature ceiling analysis and structured reform proposals grounded in CAG audits.
+* **Unified Next.js Decision-Support Platform:** [https://evinco-sih.centralindia.cloudapp.azure.com/paimana](https://evinco-sih.centralindia.cloudapp.azure.com/paimana)
+  * `Overview (/paimana)`: Portfolio Capital-at-Risk summary, macro exposure, and ranked priority review list with slide-over project sheets.
+  * `Simulator (/paimana/simulator)`: Interactive What-If sandbox to adjust project parameters (spend velocity, progress, disputes) and observe real-time risk scores.
+  * `Evidence (/paimana/evidence)`: Statistical audit proving AI superiority via DeLong's paired AUC tests, out-of-time validation, and lead-time analysis.
+  * `CUF 2.0 (/paimana/cuf-gap)`: Information-theoretic feature ceiling and structured data reform proposals grounded in CAG audits.
+* **Institutional Executive Dashboard (Static / Low-Bandwidth):** [https://evinco-sih.centralindia.cloudapp.azure.com/dashboard](https://evinco-sih.centralindia.cloudapp.azure.com/dashboard) (Direct FastAPI single-page view designed for air-gapped institutional environments).
 * **Interactive OpenAPI / Swagger Documentation:** [https://evinco-sih.centralindia.cloudapp.azure.com/docs](https://evinco-sih.centralindia.cloudapp.azure.com/docs)
-* **API Portfolio Summary Endpoint:** [https://evinco-sih.centralindia.cloudapp.azure.com/api/v1/portfolio/summary](https://evinco-sih.centralindia.cloudapp.azure.com/api/v1/portfolio/summary)
+* **API Portfolio Endpoint:** [https://evinco-sih.centralindia.cloudapp.azure.com/api/v1/portfolio/summary](https://evinco-sih.centralindia.cloudapp.azure.com/api/v1/portfolio/summary)
 
 ---
 

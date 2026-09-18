@@ -277,38 +277,101 @@ export interface ProjectDetail {
   feature_approximations: Record<string, string>;
 }
 
-/* ── New endpoint types for Simulator / Audit / CUF-Gap pages ───────── */
+/* ── Accurate endpoint types for Simulator / Audit / CUF-Gap pages ───────── */
 
 export interface OrderingSensitivity {
-  rules: Array<{
-    ordering_rule: string;
-    description: string;
-    auc_1m: number;
-    auc_3m?: number;
-    auc_6m?: number;
-    is_negative_control: boolean;
-  }>;
-  stability_verdict: string;
+  provenance: string;
+  question?: string;
+  method?: string;
+  shipped_ordering?: string;
+  negative_control?: string;
+  results: Record<
+    string,
+    {
+      status: string;
+      rows: number;
+      projects: number;
+      positive_rate: number;
+      auc: number;
+      pr_auc: number;
+      brier: number;
+      auc_delta_vs_shipped?: number;
+    }
+  >;
 }
 
 export interface LabelValidity {
-  bands: Array<{
-    band: string;
-    n: number;
-    slip_rate: number;
+  provenance: string;
+  question?: string;
+  method?: string;
+  n_slip_months?: number;
+  n_hold_months?: number;
+  indicators_all_months?: Array<{
+    indicator: string;
+    group: string;
+    meaning: string;
+    mean_before_slip: number;
+    mean_before_hold: number;
+    cohens_d: number;
+    effect_size: string;
+    observed_direction: string;
+    corroborates?: boolean;
   }>;
+  rule_f1_premise_test?: {
+    premise: string;
+    bands: Array<{
+      band: string;
+      n: number;
+      slip_rate: number;
+    }>;
+    slip_rate_when_f1_fires: number;
+    slip_rate_in_opposite_condition: number;
+    premise_inverted_for_schedule_slip: boolean;
+    interpretation: string;
+  };
+  stage_coverage_bias?: {
+    finding: string;
+    implication: string;
+  };
   verdict: string;
+  caveat?: string;
+}
+
+export interface CUFObservableCeiling {
+  discriminative_auc_ceiling: number;
+  brier_score_at_ceiling: number;
+  cost_regression_r2_ceiling: number;
+  residual_classification_error: number;
+}
+
+export interface CUFProxyAugmentation {
+  proxy_names: string[];
+  auc_before: number;
+  auc_after: number;
+  auc_delta: number;
+  rmse_before_pct: number;
+  rmse_after_pct: number;
+  rmse_delta_pct: number;
+  delayed_projects_citing_top_three_factors_pct: number;
+}
+
+export interface CUFMissingVariable {
+  variable_name: string;
+  suggested_field_name: string;
+  operational_rationale: string;
+  recommended_input_type: string;
+  primary_source_grounding: string;
+  cuf_2_0_priority: string;
 }
 
 export interface CufGap {
-  discriminative_auc_ceiling: number;
-  observable_ceiling_provenance: string;
   methodology_statement: string;
-  nlp_augmentation: {
-    auc_delta: number;
-    proxy_names: string[];
-    note: string;
-  };
+  observable_ceiling: CUFObservableCeiling;
+  observable_ceiling_provenance: string;
+  proxy_augmentation: CUFProxyAugmentation;
+  proxy_augmentation_provenance: string;
+  missing_variables_recommended: CUFMissingVariable[];
+  policy_action_items: string[];
 }
 
 export interface DelongTestInput {
@@ -325,3 +388,4 @@ export interface DelongTestResult {
   variance_auc_1: number;
   covariance_12: number;
 }
+

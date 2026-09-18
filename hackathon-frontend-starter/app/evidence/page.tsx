@@ -337,48 +337,57 @@ export default function EvidencePage() {
         ) : null}
 
         {/* Ordering Sensitivity */}
-        {ordering ? (
+        {ordering?.results ? (
           <section className="mt-12">
-            <SectionHeader>Ordering sensitivity</SectionHeader>
+            <SectionHeader trailing={ordering.shipped_ordering ? `baseline: ${ordering.shipped_ordering}` : undefined}>
+              Time-axis reconstruction robustness
+            </SectionHeader>
             <Surface padded={false}>
-              {ordering.rules.map((rule, i) => (
-                <div key={rule.ordering_rule}>
-                  {i > 0 ? <Separator className="ml-5" /> : null}
-                  <div className={cn("flex items-center gap-4 px-5 py-3.5", rule.is_negative_control && "bg-critical-wash")}>
-                    <div className="min-w-0 flex-1">
-                      <div className={cn("t-subhead truncate", rule.is_negative_control ? "text-critical font-semibold" : "")}>
-                        {rule.ordering_rule}
+              {Object.entries(ordering.results).map(([key, res], i) => {
+                const isNeg = key === ordering.negative_control || key === "reversed";
+                return (
+                  <div key={key}>
+                    {i > 0 ? <Separator className="ml-5" /> : null}
+                    <div className={cn("flex items-center gap-4 px-5 py-3.5", isNeg && "bg-critical-wash")}>
+                      <div className="min-w-0 flex-1">
+                        <div className={cn("t-subhead truncate", isNeg ? "text-critical font-semibold" : "")}>
+                          {humanise(key)}
+                        </div>
+                        <div className="t-caption text-fg-tertiary truncate">
+                          {count(res.rows)} transitions · {count(res.projects)} projects
+                        </div>
                       </div>
-                      <div className="t-caption text-fg-tertiary truncate">
-                        {rule.description}
+                      <div className="text-right">
+                        <div className="tabular t-subhead font-semibold text-fg-secondary">
+                          {res.auc !== undefined ? res.auc.toFixed(3) : "—"}
+                        </div>
+                        <div className="t-caption text-fg-tertiary">AUC (1m)</div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="tabular t-subhead font-semibold text-fg-secondary">
-                        {rule.auc_1m.toFixed(3)}
+                      <div className="w-24 shrink-0 text-right">
+                        <div className={cn("t-subhead", isNeg ? "text-critical font-semibold" : "text-fg-secondary")}>
+                          {isNeg ? "Negative control" : "Plausible"}
+                        </div>
+                        <div className="t-caption text-fg-tertiary">Control check</div>
                       </div>
-                      <div className="t-caption text-fg-tertiary">AUC (1m)</div>
-                    </div>
-                    <div className="w-24 shrink-0 text-right">
-                      <div className={cn("t-subhead", rule.is_negative_control ? "text-critical" : "text-fg-secondary")}>
-                        {rule.is_negative_control ? "Yes" : "No"}
-                      </div>
-                      <div className="t-caption text-fg-tertiary">Neg. control</div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </Surface>
-            <p className="t-footnote mt-3 max-w-prose text-fg-secondary">{ordering.stability_verdict}</p>
+            <p className="t-footnote mt-3 max-w-prose text-fg-secondary">
+              {ordering.question || "The time axis is reconstructed under assumption A1. Stability across rules confirms signal."}
+            </p>
           </section>
         ) : null}
 
         {/* Label Validity */}
-        {validity ? (
+        {validity?.rule_f1_premise_test?.bands ? (
           <section className="mt-12">
-            <SectionHeader>Label validity</SectionHeader>
+            <SectionHeader trailing="Physical vs Bureaucratic Distress">
+              Label validity & Rule F1 empirical test
+            </SectionHeader>
             <Surface padded={false}>
-              {validity.bands.map((band, i) => (
+              {validity.rule_f1_premise_test.bands.map((band, i) => (
                 <div key={band.band}>
                   {i > 0 ? <Separator className="ml-5" /> : null}
                   <div className="flex items-center gap-4 px-5 py-3.5">
@@ -389,9 +398,9 @@ export default function EvidencePage() {
                       <div className="tabular t-subhead text-fg-secondary">
                         {count(band.n)}
                       </div>
-                      <div className="t-caption text-fg-tertiary">n</div>
+                      <div className="t-caption text-fg-tertiary">months</div>
                     </div>
-                    <div className="w-16 shrink-0 text-right">
+                    <div className="w-20 shrink-0 text-right">
                       <div className="tabular t-subhead font-semibold text-accent">
                         {percent(band.slip_rate * 100, 1)}
                       </div>
@@ -401,7 +410,9 @@ export default function EvidencePage() {
                 </div>
               ))}
             </Surface>
-            <p className="t-footnote mt-3 max-w-prose text-fg-secondary">{validity.verdict}</p>
+            <p className="t-footnote mt-3 max-w-prose text-fg-secondary">
+              {validity.rule_f1_premise_test.interpretation || validity.verdict}
+            </p>
           </section>
         ) : null}
       </main>

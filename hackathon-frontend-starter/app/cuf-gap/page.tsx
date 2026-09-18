@@ -56,51 +56,67 @@ export default function CufGapPage() {
           ) : data && (
             <>
               {/* Observable Feature Ceiling Card */}
-              <Surface className="p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-fg-secondary" />
-                  <h2 className="t-title-3 text-fg">Observable Feature Ceiling</h2>
-                </div>
-                <div className="space-y-1">
-                  <div className="t-headline text-fg-secondary">Out-of-fold AUC ceiling</div>
-                  <div className="t-large-title text-fg">{data.discriminative_auc_ceiling.toFixed(3)}</div>
-                </div>
-                <div className="pt-2 pb-1">
-                  <Meter value={data.discriminative_auc_ceiling * 100} tone="bg-accent" className="" />
-                </div>
-                <p className="t-caption text-fg-tertiary">{data.observable_ceiling_provenance}</p>
-              </Surface>
+              {data.observable_ceiling && (
+                <Surface className="p-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-fg-secondary" />
+                    <h2 className="t-title-3 text-fg">Observable Feature Ceiling</h2>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="t-headline text-fg-secondary">Out-of-fold AUC ceiling</div>
+                    <div className="t-large-title text-fg">
+                      {(data.observable_ceiling.discriminative_auc_ceiling ?? 0).toFixed(3)}
+                    </div>
+                  </div>
+                  <div className="pt-2 pb-1">
+                    <Meter
+                      value={(data.observable_ceiling.discriminative_auc_ceiling ?? 0) * 100}
+                      tone="bg-accent"
+                    />
+                  </div>
+                  <p className="t-caption text-fg-tertiary">
+                    {data.observable_ceiling_provenance || "Empirical asymptotic performance ceiling of observable CUF fields under GroupKFold"}
+                  </p>
+                </Surface>
+              )}
 
               {/* NLP Delay-Narrative Augmentation Card */}
-              <Surface className="p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <FlaskConical className="w-5 h-5 text-fg-secondary" />
-                  <h2 className="t-title-3 text-fg">NLP Delay-Narrative Augmentation</h2>
-                </div>
-                
-                {data.nlp_augmentation.auc_delta === -1.0 ? (
-                  <div className="p-4 bg-moderate/10 ring-1 ring-moderate/20 rounded-[var(--radius-card)] space-y-2">
-                    <div className="flex items-center gap-2 text-moderate font-medium t-subhead">
-                      <AlertTriangle className="w-4 h-4" />
-                      NOT MEASURABLE
-                    </div>
-                    <p className="t-subhead text-moderate">
-                      The public CUF feed does not publish granular delay-narrative remarks. The NLP proxy extractors (contractor cashflow, litigation, environment/forest, land acquisition, law & order) cannot be evaluated until the remarks column is populated.
-                    </p>
+              {data.proxy_augmentation && (
+                <Surface className="p-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="w-5 h-5 text-fg-secondary" />
+                    <h2 className="t-title-3 text-fg">NLP Delay-Narrative Augmentation</h2>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="t-headline text-emerald-600">+{data.nlp_augmentation.auc_delta.toFixed(2)} AUC</div>
-                    <div className="flex flex-wrap gap-2">
-                      {data.nlp_augmentation.proxy_names.map(name => (
-                        <div key={name} className="px-3 py-1 rounded-full bg-surface-sunken ring-1 ring-hairline t-footnote text-fg-secondary">
-                          {name}
-                        </div>
-                      ))}
+
+                  {data.proxy_augmentation.auc_delta === -1.0 ? (
+                    <div className="p-4 bg-moderate/10 ring-1 ring-moderate/20 rounded-[var(--radius-card)] space-y-2">
+                      <div className="flex items-center gap-2 text-moderate font-medium t-subhead">
+                        <AlertTriangle className="w-4 h-4" />
+                        NOT MEASURABLE ON PUBLIC FEED
+                      </div>
+                      <p className="t-subhead text-fg-secondary">
+                        The public CUF feed does not publish granular delay-narrative remarks. The NLP proxy extractors (contractor cashflow, litigation, environment/forest, land acquisition, law & order) cannot be evaluated until the remarks column is populated.
+                      </p>
                     </div>
-                  </div>
-                )}
-              </Surface>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="t-headline text-emerald-600">
+                        +{(data.proxy_augmentation.auc_delta ?? 0).toFixed(2)} AUC
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {(data.proxy_augmentation.proxy_names ?? []).map((name) => (
+                          <div
+                            key={name}
+                            className="px-3 py-1 rounded-full bg-surface-sunken ring-1 ring-hairline t-footnote text-fg-secondary"
+                          >
+                            {name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Surface>
+              )}
 
               {/* Methodology Statement Card */}
               <Surface className="p-6 flex gap-4">

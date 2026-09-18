@@ -8,7 +8,8 @@
  */
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "http://localhost:8012";
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ??
+  (typeof window === "undefined" ? "http://127.0.0.1:8001" : "");
 
 export type RiskTier = "LOW" | "MODERATE" | "HIGH" | "CRITICAL";
 export type DominantSource = "MACHINE_LEARNING" | "RULE_FLOOR_OVERRIDE";

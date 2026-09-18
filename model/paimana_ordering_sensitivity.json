@@ -1,0 +1,64 @@
+{
+  "provenance": "measured",
+  "question": "Does the headline result depend on how the unobserved time axis was reconstructed? The PAIMANA feed returns Month=null/Year=null on every record, so snapshot order is inferred under assumption A1 rather than observed.",
+  "method": "Rebuild the panel under each ordering rule, retrain under the identical protocol (GroupKFold k=5 grouped by project_id, same seed, same features), compare AUC.",
+  "shipped_ordering": "expenditure_progress",
+  "negative_control": "reversed",
+  "results": {
+    "expenditure_progress": {
+      "status": "ok",
+      "rows": 8838,
+      "projects": 1631,
+      "positive_rate": 0.2236,
+      "auc": 0.8541,
+      "pr_auc": 0.6448,
+      "brier": 0.1458,
+      "auc_delta_vs_shipped": 0.0
+    },
+    "progress_first": {
+      "status": "ok",
+      "rows": 8866,
+      "projects": 1639,
+      "positive_rate": 0.2238,
+      "auc": 0.8522,
+      "pr_auc": 0.6418,
+      "brier": 0.1469,
+      "auc_delta_vs_shipped": -0.0019
+    },
+    "expenditure_only": {
+      "status": "ok",
+      "rows": 8821,
+      "projects": 1627,
+      "positive_rate": 0.2188,
+      "auc": 0.8558,
+      "pr_auc": 0.644,
+      "brier": 0.1443,
+      "auc_delta_vs_shipped": 0.0017
+    },
+    "revised_date_first": {
+      "status": "ok",
+      "rows": 8831,
+      "projects": 1628,
+      "positive_rate": 0.2282,
+      "auc": 0.8532,
+      "pr_auc": 0.6552,
+      "brier": 0.1462,
+      "auc_delta_vs_shipped": -0.0009
+    },
+    "reversed": {
+      "status": "ok",
+      "rows": 3431,
+      "projects": 663,
+      "positive_rate": 0.0274,
+      "auc": 0.683,
+      "pr_auc": 0.2001,
+      "brier": 0.0368,
+      "auc_delta_vs_shipped": -0.1711
+    }
+  },
+  "auc_spread_across_plausible_orderings": 0.0036,
+  "negative_control_auc_drop": 0.1711,
+  "stability_verdict": "STABLE: across every plausible ordering rule the headline AUC moves by at most 0.0036, so the result does not depend on which monotone quantity is treated as authoritative under assumption A1.",
+  "negative_control_verdict": "PASSED: deliberately inverting the time axis costs 0.1711 AUC, confirming the panel is ordered by something real rather than scoring well regardless.",
+  "caveat": "This tests robustness to the ORDERING rule, not to assumption A2 (monthly cadence and harvest-month anchoring). A2 affects month-denominated figures such as lead time, which remain approximate."
+}

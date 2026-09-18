@@ -1,0 +1,186 @@
+{
+  "provenance": "measured",
+  "question": "The label is 'a date moved on a government form'. Does that bureaucratic event correspond to physical distress on site, or is the model predicting paperwork?",
+  "method": "Compare indicators observable at time t between project-months followed by a filed revision and those that were not, grouped by what each indicator actually tests. Effect size is Cohen's d; p-values are deliberately omitted because at n=8,838 almost any difference is significant while saying nothing about magnitude. The comparison is then repeated on physically-active months only, as a control.",
+  "n_slip_months": 2065,
+  "n_hold_months": 9466,
+  "indicators_all_months": [
+    {
+      "indicator": "schedule_pressure",
+      "group": "schedule_relative",
+      "meaning": "Fraction of schedule elapsed minus fraction of work complete",
+      "mean_before_slip": 0.8531,
+      "mean_before_hold": 0.6941,
+      "cohens_d": 0.2192,
+      "effect_size": "small",
+      "observed_direction": "higher",
+      "expected_if_physical": "higher",
+      "corroborates": true
+    },
+    {
+      "indicator": "velocity_deficit",
+      "group": "schedule_relative",
+      "meaning": "Pace the declared date requires, minus pace actually achieved (%/month)",
+      "mean_before_slip": 5.6202,
+      "mean_before_hold": 4.3953,
+      "cohens_d": 0.0854,
+      "effect_size": "negligible",
+      "observed_direction": "higher",
+      "expected_if_physical": "higher",
+      "corroborates": false
+    },
+    {
+      "indicator": "progress_delta",
+      "group": "absolute_activity",
+      "meaning": "Physical progress added in the reporting month (%)",
+      "mean_before_slip": 1.4697,
+      "mean_before_hold": 1.8453,
+      "cohens_d": -0.054,
+      "effect_size": "negligible",
+      "observed_direction": "lower"
+    },
+    {
+      "indicator": "progress_velocity",
+      "group": "absolute_activity",
+      "meaning": "Recent physical progress rate (%/month)",
+      "mean_before_slip": 2.6097,
+      "mean_before_hold": 2.1485,
+      "cohens_d": 0.0662,
+      "effect_size": "negligible",
+      "observed_direction": "higher"
+    },
+    {
+      "indicator": "stall_streak",
+      "group": "absolute_activity",
+      "meaning": "Consecutive reporting months with no physical movement",
+      "mean_before_slip": 1.2053,
+      "mean_before_hold": 1.2887,
+      "cohens_d": -0.0435,
+      "effect_size": "negligible",
+      "observed_direction": "lower"
+    },
+    {
+      "indicator": "spend_progress_gap",
+      "group": "spend_pattern",
+      "meaning": "Cumulative spend % minus physical progress % (rule F1's trigger metric)",
+      "mean_before_slip": -23.3976,
+      "mean_before_hold": 1.0202,
+      "cohens_d": -0.324,
+      "effect_size": "medium",
+      "observed_direction": "lower"
+    }
+  ],
+  "indicators_active_months_only": [
+    {
+      "indicator": "schedule_pressure",
+      "group": "schedule_relative",
+      "meaning": "Fraction of schedule elapsed minus fraction of work complete",
+      "mean_before_slip": 0.6582,
+      "mean_before_hold": 0.5373,
+      "cohens_d": 0.2467,
+      "effect_size": "small",
+      "observed_direction": "higher",
+      "expected_if_physical": "higher",
+      "corroborates": true
+    },
+    {
+      "indicator": "velocity_deficit",
+      "group": "schedule_relative",
+      "meaning": "Pace the declared date requires, minus pace actually achieved (%/month)",
+      "mean_before_slip": 4.566,
+      "mean_before_hold": 1.1423,
+      "cohens_d": 0.3184,
+      "effect_size": "medium",
+      "observed_direction": "higher",
+      "expected_if_physical": "higher",
+      "corroborates": true
+    },
+    {
+      "indicator": "progress_delta",
+      "group": "absolute_activity",
+      "meaning": "Physical progress added in the reporting month (%)",
+      "mean_before_slip": 3.739,
+      "mean_before_hold": 4.5707,
+      "cohens_d": -0.0829,
+      "effect_size": "negligible",
+      "observed_direction": "lower"
+    },
+    {
+      "indicator": "progress_velocity",
+      "group": "absolute_activity",
+      "meaning": "Recent physical progress rate (%/month)",
+      "mean_before_slip": 3.8805,
+      "mean_before_hold": 4.1463,
+      "cohens_d": -0.029,
+      "effect_size": "negligible",
+      "observed_direction": "lower"
+    },
+    {
+      "indicator": "stall_streak",
+      "group": "absolute_activity",
+      "meaning": "Consecutive reporting months with no physical movement",
+      "mean_before_slip": 0.0,
+      "mean_before_hold": 0.0,
+      "cohens_d": 0.0,
+      "effect_size": "negligible",
+      "observed_direction": "lower"
+    },
+    {
+      "indicator": "spend_progress_gap",
+      "group": "spend_pattern",
+      "meaning": "Cumulative spend % minus physical progress % (rule F1's trigger metric)",
+      "mean_before_slip": -22.8934,
+      "mean_before_hold": -8.6523,
+      "cohens_d": -0.2811,
+      "effect_size": "small",
+      "observed_direction": "lower"
+    }
+  ],
+  "rule_f1_premise_test": {
+    "premise": "Rule F1 assumes disbursement running ahead of physical progress predicts trouble.",
+    "bands": [
+      {
+        "band": "spend far ahead of progress (gap >= 25pp, F1 fires)",
+        "n": 1578,
+        "slip_rate": 0.0716
+      },
+      {
+        "band": "roughly aligned (-25pp < gap < 25pp)",
+        "n": 6324,
+        "slip_rate": 0.142
+      },
+      {
+        "band": "progress far ahead of spend (gap <= -25pp)",
+        "n": 3629,
+        "slip_rate": 0.2904
+      }
+    ],
+    "slip_rate_when_f1_fires": 0.0716,
+    "slip_rate_in_opposite_condition": 0.2904,
+    "premise_inverted_for_schedule_slip": true,
+    "interpretation": "The premise is INVERTED for schedule forecasting: project-months where physical progress runs far ahead of spending slip at a markedly HIGHER rate than the ones F1 flags. This explains, mechanically, why the shipped rule set scores AUC 0.433 against this outcome. F1 remains a legitimate FINANCIAL-IRREGULARITY flag with statutory grounding, and is retained as one \u2014 but it must not be presented as a schedule predictor, because pointed at that outcome it is worse than random."
+  },
+  "stage_coverage_bias": {
+    "question": "Are non-revising projects dormant, or simply at an earlier stage?",
+    "cohorts": {
+      "never_revises": {
+        "projects": 725,
+        "project_months": 4338,
+        "mean_physical_progress": 51.03,
+        "mean_progress_delta": 1.663,
+        "stalled_share": 0.579
+      },
+      "revises_at_least_once": {
+        "projects": 1082,
+        "project_months": 7193,
+        "mean_physical_progress": 75.4,
+        "mean_progress_delta": 1.847,
+        "stalled_share": 0.588
+      }
+    },
+    "finding": "Projects that never file a revision are NOT dormant \u2014 their monthly progress rate (1.663%) is indistinguishable from projects that do revise (1.847%). They are simply EARLIER: mean physical progress 51.03% vs 75.4%. A date is revised when the declared deadline comes into view and the agency can see it will be missed, so the label is structurally weighted toward later-stage projects.",
+    "implication": "This is a real coverage limit. The platform detects slippage that gets ACKNOWLEDGED. A project that is genuinely delayed but whose agency never files a revision is invisible to this label, and no correction for that is attempted."
+  },
+  "verdict": "PARTIALLY GROUNDED: 1 of 2 schedule-relative indicators corroborate the label. Claims about predicting real-world delay should be hedged.",
+  "caveat": "Establishes correlation between a filing and prior schedule distress, not causation. It cannot detect delay that is real but never filed."
+}

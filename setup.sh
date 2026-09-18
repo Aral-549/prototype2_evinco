@@ -38,9 +38,30 @@ echo "Installing dependencies from backend/requirements.txt..."
 python -m pip install --upgrade pip
 pip install -r backend/requirements.txt
 
-# 5. Run automated test suite to verify installation
-echo "Running automated test suite (140 tests)..."
-PYTHONPATH=backend pytest backend -q
+# 5. Build the model artifacts from the harvested MoSPI panel.
+#    Every performance figure the platform reports comes from these files, so
+#    a checkout without them serves a degraded legacy model and the benchmark
+#    endpoints return 503. Regenerating is deterministic (seeded).
+if [ ! -f "model/paimana_model_metrics.json" ] || [ "${REBUILD_MODEL:-0}" = "1" ]; then
+    echo "Harvesting 13 freeze months from the live MoSPI portal..."
+    python scripts/harvest_monthly.py
+    echo "Building longitudinal panel from the harvested MoSPI data..."
+    python scripts/build_panel.py
+    echo "Training and benchmarking the early-warning model..."
+    python scripts/train_model.py
+    echo "Measuring early-warning lead time..."
+    python scripts/lead_time_backtest.py
+    echo "Checking whether the label tracks physical distress..."
+    python scripts/label_validity.py
+    echo "Testing robustness to the reconstructed time axis (retrains 5x, ~2 min)..."
+    python scripts/ordering_sensitivity.py
+else
+    echo "Model artifacts already present (set REBUILD_MODEL=1 to rebuild)."
+fi
+
+# 6. Run automated test suite to verify installation
+echo "Running automated test suite (service tests + frozen golden cases)..."
+PYTHONPATH=backend pytest backend tests -q
 
 echo ""
 echo "======================================================================"

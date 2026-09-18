@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.api import api_v1_router
 from app.services.model_service import ModelService
@@ -67,6 +68,19 @@ def _get_dashboard_html() -> str | None:
         if c.exists():
             return c.read_text(encoding="utf-8")
     return None
+
+
+# Serve the frontend directory so the dashboard can load vendored assets.
+# Tailwind is vendored locally (frontend/vendor/) rather than pulled from
+# cdn.tailwindcss.com at runtime: the page takes ALL of its layout from
+# Tailwind classes, so on a machine without internet -- a real possibility at
+# a demo venue -- the CDN version renders as an unstyled wall of text.
+if settings.FRONTEND_DIR.exists():
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(settings.FRONTEND_DIR)),
+        name="static",
+    )
 
 
 @app.get("/dashboard", summary="Executive Command Center", response_class=HTMLResponse, tags=["Frontend"])

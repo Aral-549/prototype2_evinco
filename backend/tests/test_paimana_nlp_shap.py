@@ -79,7 +79,13 @@ class TestExplainPredictionShap:
 
         from app.config import settings
         bundle = joblib.load(settings.MODEL_PATH)
-        model = bundle["model"]
+        # v2 bundles carry one booster per forecast horizon under "models";
+        # v1 carried a single estimator under "model".
+        model = (
+            bundle["models"][bundle.get("primary_horizon", "1m")]
+            if "models" in bundle
+            else bundle["model"]
+        )
         cols = bundle["feature_columns"]
 
         row = np.zeros((1, len(cols)), dtype=np.float32)
@@ -100,7 +106,13 @@ class TestExplainPredictionShap:
         from app.config import settings
 
         bundle = joblib.load(settings.MODEL_PATH)
-        model = bundle["model"]
+        # v2 bundles carry one booster per forecast horizon under "models";
+        # v1 carried a single estimator under "model".
+        model = (
+            bundle["models"][bundle.get("primary_horizon", "1m")]
+            if "models" in bundle
+            else bundle["model"]
+        )
         cols = bundle["feature_columns"]
         row = np.ones((1, len(cols)), dtype=np.float32)
         _, drivers = explain_prediction_shap(model, row, cols, top_k=3)

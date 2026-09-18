@@ -453,6 +453,16 @@ class ProjectGovernanceAssessment(BaseModel):
     implementing_agency: str = Field(..., description="Implementing Agency")
 
     # Capital Scale
+    physical_progress: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description=(
+            "Cumulative physical completion % at the assessed reporting period. Carried on "
+            "the assessment so portfolio/leaderboard views can show execution state without "
+            "a second lookup."
+        ),
+    )
     original_cost_crores: float = Field(..., description="Sanctioned Capital Cost (₹ Cr)")
     revised_cost_crores: Optional[float] = Field(None, description="Current Revised Cost (₹ Cr)")
 

@@ -36,7 +36,7 @@ class TestCleanProject:
         assert ev.active_signals_count == 0
         assert ev.critical_override is False
         assert all(not s.is_active for s in ev.signals)
-        assert len(ev.signals) == 5  # F1..F5 always evaluated
+        assert len(ev.signals) == 6  # F1..F6 always evaluated
 
     def test_summary_normal_message(self):
         ev = calculate_rule_floor(_project())

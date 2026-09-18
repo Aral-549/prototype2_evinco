@@ -120,6 +120,11 @@ def formulate_interventions(
         interventions.append(
             "Initiate structured conciliation under the Arbitration Act and assess contractor liquidity before further escrow drawdowns."
         )
+    if "F6" in active_flags:
+        interventions.append(
+            "Completion date on record has elapsed with work incomplete: demand a formal Revised Cost/Date Estimate "
+            "filing within 30 days and freeze further milestone-linked disbursement until it is received."
+        )
     if car_result.is_sector_fallback_used and risk_tier in ("HIGH", "CRITICAL"):
         interventions.append(
             "Apply the empirical sector-median overrun prior in budget re-projection until a Revised Cost Estimate is formally filed."
@@ -175,6 +180,7 @@ def assess_project(
         project_name=project.project_name,
         sector=project.sector,
         implementing_agency=project.implementing_agency,
+        physical_progress=project.physical_progress,
         original_cost_crores=project.original_cost,
         revised_cost_crores=project.revised_cost,
         p_model=round(p_model, 4),

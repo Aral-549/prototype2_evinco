@@ -39,14 +39,23 @@ def evaluate_project(
     base_rate_probability: Optional[float] = None
 
     if include_drivers:
-        # explain() runs leak-free inference and native C++ TreeSHAP in one pass.
+        # explain() runs inference and native C++ TreeSHAP in one pass.
         p_model, base_rate_probability, shap_drivers = model_service.explain(project, top_k=5)
     else:
-        proba_input = model_service.build_leak_free_frame(project)
-        if model_service.imputer is not None:
-            proba_input = model_service.imputer.transform(proba_input)
-        p_model = float(model_service.model.predict_proba(proba_input)[0][1])
-        base_rate_probability = 0.5
+        # Fast path for whole-portfolio scoring: skip TreeSHAP, but go through
+        # predict() so the isotonic calibrator is still applied. Reaching into
+        # the raw booster here would silently serve uncalibrated probabilities
+        # on the portfolio leaderboard while the single-project endpoint served
+        # calibrated ones -- and Capital-at-Risk multiplies that number by
+        # rupees, so the two views would disagree in crores.
+        p_model, _decision, _contribs = model_service.predict(project)
+        # The class prior is the honest reference point for "how does this
+        # project compare to the portfolio", not a hardcoded 0.5.
+        base_rate_probability = (
+            float(model_service.class_prior)
+            if model_service.class_prior is not None
+            else 0.5
+        )
 
     return assess_project(
         project=project,

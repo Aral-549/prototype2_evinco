@@ -40,6 +40,7 @@ def calculate_rule_floor(
         "F3": 25.0,  # Milestone Slippage Density / Clearance Stall
         "F4": 20.0,  # Reporting Non-Compliance / Stale Registry
         "F5": 30.0,  # Contractual Litigation / Arbitration Notice
+        "F6": 25.0,  # Declared Completion Date Elapsed
     }
     if custom_weights:
         weights.update(custom_weights)
@@ -202,6 +203,49 @@ def calculate_rule_floor(
             statutory_rationale=(
                 "Arbitration Act / High Court stay injunction actively freezes site access, escrow drawdowns, "
                 "or structural works. Multiplies median completion timeline by 2.4x."
+            ),
+        )
+    )
+
+    # ------------------------------------------------------------------------
+    # Flag F6: Declared Completion Date Elapsed
+    # Condition: original_duration + current_delay - months_elapsed <= 0 AND Progress < 95%
+    #
+    # Added from measurement, not assumption (contracts/rule_floor.md). On the
+    # 8,838-transition MoSPI panel this condition covers 32.1% of project-months
+    # and carries a 4.3x lift on the next-report slip rate (46.7% vs 10.9%),
+    # AUC 0.725 standing alone -- stronger than F1 and F2 combined, which score
+    # 0.433 against the same outcome. A completion date that has passed while
+    # work is incomplete is a statutory fact, and the rule set was missing it.
+    # ------------------------------------------------------------------------
+    months_to_declared_date = (
+        project.original_duration_months + project.current_delay_months - project.months_elapsed
+    )
+    f6_active = bool(months_to_declared_date <= 0.0 and project.physical_progress < 95.0)
+    months_overdue = max(0.0, -months_to_declared_date)
+
+    f6_weight = weights["F6"] if f6_active else 0.0
+    if f6_active:
+        total_weight += f6_weight
+        if months_overdue >= 12.0:
+            has_critical_override = True
+
+    evaluated_signals.append(
+        RuleActivationSignal(
+            flag_id="F6",
+            signal_code="DECLARED_DATE_ELAPSED",
+            rule_name="Declared Completion Date Elapsed With Work Incomplete",
+            severity="CRITICAL" if months_overdue >= 12.0 else "HIGH",
+            weight=f6_weight,
+            is_active=f6_active,
+            metric_name="months_past_declared_completion_date",
+            metric_value=round(months_overdue, 2),
+            threshold_value=0.0,
+            statutory_rationale=(
+                "The completion date currently on record with MoSPI has already elapsed while "
+                "physical execution remains below 95%. A revised date filing is statutorily "
+                "overdue; empirically this condition precedes a formal date revision at 4.3x "
+                "the portfolio base rate."
             ),
         )
     )

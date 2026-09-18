@@ -4,10 +4,12 @@ from collections import defaultdict
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 
 from app.paimana_contracts import ProjectGovernanceAssessment
 from app.schemas.analytics import PortfolioSummaryResponse, SectorRiskAggregation
-from app.services.governance_service import ModelNotLoadedError
+from app.services.governance_service import ModelNotLoadedError, evaluate_project
+from app.services.model_service import ModelService
 from app.services.real_data import get_evaluated_portfolio, load_real_projects
 
 router = APIRouter()
@@ -110,6 +112,13 @@ def get_risk_ranking(
         le=5000,
         description="Optional maximum number of projects to return",
     ),
+    slim: bool = Query(
+        default=False,
+        description=(
+            "Omit per-project rule_signals, shap_drivers and prescriptive_interventions. "
+            "Those make up ~82% of the payload and are not used by leaderboard views."
+        ),
+    ),
 ) -> List[ProjectGovernanceAssessment]:
     """
     Returns individual monitored infrastructure projects sorted by Capital-at-Risk (CaR).
@@ -126,4 +135,69 @@ def get_risk_ranking(
     evaluated.sort(key=lambda p: p.capital_at_risk_crores, reverse=True)
     if limit is not None:
         evaluated = evaluated[:limit]
+
+    if slim:
+        # The full assessment carries six RuleActivationSignal objects per
+        # project, each with a paragraph of statutory rationale -- 82% of the
+        # payload (2,918 of 3,563 bytes) for fields a leaderboard never renders.
+        # Returning the whole portfolio unslimmed is 7.7 MB, which is enough to
+        # make the dashboard look broken on a slow connection.
+        #
+        # A JSONResponse is returned directly so FastAPI skips `response_model`
+        # validation, which would otherwise re-populate the omitted fields.
+        heavy = {"rule_signals", "shap_drivers", "prescriptive_interventions"}
+        return JSONResponse(
+            content=[p.model_dump(mode="json", exclude=heavy) for p in evaluated]
+        )
     return evaluated
+
+
+@router.get(
+    "/portfolio/project/{project_id}",
+    summary="Full assessment + horizon curve for one monitored project",
+)
+def get_project_detail(project_id: str) -> dict:
+    """
+    Everything a detail view needs for a monitored project, scored from the
+    project's own stored CUF record.
+
+    This endpoint exists because the alternative is worse. A client holding a
+    slim leaderboard row does not have the schedule fields (`months_elapsed`,
+    `original_duration_months`, `current_delay_months`), and those drive the
+    model's strongest features. Rebuilding an input from the row and re-scoring
+    it silently produced p_model ~= 0.01 for every project while the row it was
+    opened from said 0.15-0.51 -- a detail view that disagreed with the list
+    that launched it. Serving the real record removes that whole class of
+    error rather than patching one symptom of it.
+    """
+    project = next(
+        (p for p in load_real_projects() if p.project_id == project_id), None
+    )
+    if project is None:
+        raise HTTPException(status_code=404, detail=f"Unknown project '{project_id}'.")
+
+    try:
+        assessment = evaluate_project(project, include_drivers=True)
+    except ModelNotLoadedError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    model_service = ModelService.get_instance()
+    horizons: dict = {}
+    approximations: dict = {}
+    if model_service.bundle_generation == "v2-panel-trained":
+        horizons = model_service.predict_horizons(project)
+        _frame, approximations = model_service.build_frame(project)
+
+    return {
+        "assessment": assessment.model_dump(mode="json"),
+        "horizons": horizons,
+        "horizon_definitions": {
+            "1m": "revised completion date moves at the next monthly report",
+            "3m": "revised completion date moves at any report within 3 months",
+            "6m": "revised completion date moves at any report within 6 months",
+        },
+        # The served portfolio holds ONE snapshot per project, so the three
+        # history-dependent features are still approximated here exactly as
+        # they are for an ad-hoc CUF submission. Reported rather than hidden.
+        "feature_approximations": approximations,
+    }

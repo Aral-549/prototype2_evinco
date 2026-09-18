@@ -30,29 +30,109 @@ from app.schemas.analytics import (
 from app.paimana_contracts import ProjectInput
 
 # ---------------------------------------------------------------------------
-# Registered benchmark figures (Spec Section 2.8 "Empirical Pilot Proxy
-# Methodology" and Section 4.5 item 2). These are the specification's
-# protocol-level reference values for the observable ceiling and the NLP
-# proxy augmentation deltas; they are reported as protocol constants, not
-# as a fabricated decomposition of unrecorded variance.
+# The observable ceiling is READ FROM THE MEASURED TRAINING ARTIFACT, not
+# declared here. An earlier revision carried "protocol-level reference values"
+# (AUC ceiling 0.81, NLP augmentation 0.756 -> 0.814) which had never been
+# computed on this data -- the same class of defect as the deleted
+# "CUF explains 64.2%" claim, only better dressed. Constants that describe
+# model performance do not belong in the serving layer.
 # ---------------------------------------------------------------------------
-_OBSERVABLE_CEILING = CUFObservableCeiling(
-    discriminative_auc_ceiling=0.81,
-    brier_score_at_ceiling=0.128,
-    cost_regression_r2_ceiling=0.46,
-    residual_classification_error=round(1.0 - 0.81, 4),
-)
 
-_PROXY_AUGMENTATION = CUFProxyAugmentation(
-    proxy_names=sorted(NLP_BOTTLENECK_RULES.keys()),
-    auc_before=0.756,
-    auc_after=0.814,
-    auc_delta=0.058,
-    rmse_before_pct=24.1,
-    rmse_after_pct=21.3,
-    rmse_delta_pct=2.8,
-    delayed_projects_citing_top_three_factors_pct=60.0,
-)
+
+def _measured_ceiling() -> Tuple[CUFObservableCeiling, str]:
+    """Empirical ceiling of the observable CUF feature set, from the real run.
+
+    Returns the ceiling plus a provenance string. When the training pipeline
+    has not been run we say the number is unavailable rather than substitute
+    a plausible one.
+    """
+    from app.services.model_service import load_training_metrics
+
+    metrics = load_training_metrics()
+    if not metrics:
+        return (
+            CUFObservableCeiling(
+                discriminative_auc_ceiling=0.0,
+                brier_score_at_ceiling=0.0,
+                cost_regression_r2_ceiling=0.0,
+                residual_classification_error=0.0,
+            ),
+            "UNAVAILABLE: run scripts/build_panel.py && scripts/train_model.py. "
+            "No value is reported because none has been measured.",
+        )
+
+    primary = metrics.get("horizons", {}).get("1m", {})
+    rows = primary.get("splits", {}).get("primary", {}).get("results", [])
+    best = max((r for r in rows if "auc" in r), key=lambda r: r["auc"], default=None)
+    if best is None:
+        return (
+            CUFObservableCeiling(
+                discriminative_auc_ceiling=0.0,
+                brier_score_at_ceiling=0.0,
+                cost_regression_r2_ceiling=0.0,
+                residual_classification_error=0.0,
+            ),
+            "UNAVAILABLE: metrics artifact present but contains no scored models.",
+        )
+
+    return (
+        CUFObservableCeiling(
+            discriminative_auc_ceiling=best["auc"],
+            brier_score_at_ceiling=best["brier"],
+            # Continuous cost-escalation regression is not part of the current
+            # pipeline: the public feed reports COST_OVERRUN_PERC as 0 on all
+            # 14,917 records, so no cost-overrun target exists to regress.
+            cost_regression_r2_ceiling=-1.0,
+            residual_classification_error=round(1.0 - best["auc"], 4),
+        ),
+        (
+            f"MEASURED: best-of-class out-of-fold AUC under "
+            f"{primary.get('splits', {}).get('primary', {}).get('name', 'GroupKFold')} "
+            f"on {primary.get('rows_labelled')} labelled transitions from the live MoSPI panel. "
+            f"cost_regression_r2_ceiling is -1.0 as a sentinel: COST_OVERRUN_PERC is zero on "
+            f"all 14,917 public records, so there is no cost-escalation target to regress and "
+            f"no R^2 is claimed."
+        ),
+    )
+
+
+def _proxy_augmentation_status() -> Tuple[CUFProxyAugmentation, str]:
+    """NLP bottleneck-proxy augmentation: NOT MEASURABLE on the public feed.
+
+    The proxy miner in app/paimana_nlp.py is implemented and unit-tested, but
+    it has no input here: `Remarks`, `RevisedDateReason` and `RevisedCostReason`
+    are null on all 14,917 records the PAIMANA public portal returns. An
+    earlier revision reported a 0.756 -> 0.814 AUC gain from these proxies.
+    That gain cannot exist on data where the source text does not exist.
+
+    The honest deliverable is therefore the CUF 2.0 field proposal below: the
+    ministry holds these narratives internally and does not publish them.
+    """
+    return (
+        CUFProxyAugmentation(
+            proxy_names=sorted(NLP_BOTTLENECK_RULES.keys()),
+            # -1.0 is a sentinel meaning "not measurable", chosen so that any
+            # consumer plotting these values produces an obviously wrong chart
+            # rather than a plausible-looking one.
+            auc_before=-1.0,
+            auc_after=-1.0,
+            auc_delta=-1.0,
+            rmse_before_pct=-1.0,
+            rmse_after_pct=-1.0,
+            rmse_delta_pct=-1.0,
+            delayed_projects_citing_top_three_factors_pct=-1.0,
+        ),
+        (
+            "NOT MEASURABLE ON PUBLIC DATA: every numeric field is the sentinel -1.0. "
+            "Remarks, RevisedDateReason and RevisedCostReason are null on 14,917/14,917 "
+            "records returned by https://paimana-proj.mospi.gov.in/, so the NLP bottleneck "
+            "proxies have no source text and no augmentation delta can be computed. The "
+            "extractor is implemented and unit-tested and will produce a measurable delta "
+            "the moment MoSPI exposes the narratives it already collects internally -- which "
+            "is precisely the CUF 2.0 recommendation below."
+        ),
+    )
+
 
 # Health & Family Welfare / Atomic Energy style small-N sectors are excluded
 # from CUF 2.0 field proposals; each proposal cites its primary source.
@@ -134,16 +214,23 @@ class CUFAnalyticsService:
     @staticmethod
     def get_gap_analysis() -> CUFGapAnalysisResponse:
         """Returns the Dimension (c) response: ceiling + proxies + CUF 2.0 proposals."""
+        ceiling, ceiling_provenance = _measured_ceiling()
+        proxies, proxy_provenance = _proxy_augmentation_status()
         return CUFGapAnalysisResponse(
             methodology_statement=(
                 "It is mathematically impossible to compute an empirical variance decomposition on "
                 "variables that were never recorded in the dataset. This endpoint therefore reports "
                 "only (1) the empirical asymptotic performance ceiling of the observable CUF feature "
-                "set and (2) the empirical delta from deterministic NLP bottleneck proxies mined from "
-                "the 'Reasons for Delay' narratives - never a fabricated split of unobserved variance."
+                "set, measured on the live panel, and (2) whether the NLP bottleneck-proxy "
+                "augmentation is measurable at all on the public feed - which it is not, because "
+                "the delay narratives are never published. Numbers that have not been measured are "
+                "returned as the sentinel -1.0 with an explicit provenance string, never as a "
+                "plausible-looking constant and never as a fabricated split of unobserved variance."
             ),
-            observable_ceiling=_OBSERVABLE_CEILING,
-            proxy_augmentation=_PROXY_AUGMENTATION,
+            observable_ceiling=ceiling,
+            proxy_augmentation=proxies,
+            observable_ceiling_provenance=ceiling_provenance,
+            proxy_augmentation_provenance=proxy_provenance,
             missing_variables_recommended=_CUF_2_0_PROPOSALS,
             policy_action_items=_POLICY_ACTION_ITEMS,
         )

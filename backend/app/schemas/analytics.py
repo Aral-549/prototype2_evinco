@@ -91,7 +91,18 @@ class CUFGapAnalysisResponse(BaseModel):
         ),
     )
     observable_ceiling: CUFObservableCeiling
+    observable_ceiling_provenance: str = Field(
+        default="",
+        description="Where the ceiling numbers came from; 'MEASURED' or an explicit UNAVAILABLE reason.",
+    )
     proxy_augmentation: CUFProxyAugmentation
+    proxy_augmentation_provenance: str = Field(
+        default="",
+        description=(
+            "Whether the NLP proxy delta is measurable at all. A value of -1.0 in any "
+            "proxy_augmentation field is a sentinel meaning 'not measurable', never a result."
+        ),
+    )
     missing_variables_recommended: List[CUFMissingVariable]
     policy_action_items: List[str]
 

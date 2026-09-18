@@ -13,67 +13,21 @@ from fastapi import APIRouter, HTTPException
 from app.paimana_nlp import extract_bottleneck_proxies
 from app.paimana_statistics import DeLongResult
 from app.schemas.analytics import (
-    BenchmarkModelRow,
-    BenchmarkResponse,
     CUFGapAnalysisResponse,
     ProjectDriversResponse,
 )
 from app.paimana_contracts import ProjectInput
 from app.services.cuf_analytics import CUFAnalyticsService
 from app.services.governance_service import ModelNotLoadedError
-from app.services.model_service import ModelService
+from app.services.model_service import (
+    ModelService,
+    load_label_validity,
+    load_lead_time_report,
+    load_ordering_sensitivity,
+    load_training_metrics,
+)
 
 router = APIRouter()
-
-# ---------------------------------------------------------------------------
-# Dimension (b) benchmark values (Spec Section 2.7, Table A).
-# PROTOCOL REFERENCE VALUES, NOT A LIVE EVALUATION: these rows are the
-# specification's registered benchmark constants. They are reported as-is
-# with an explicit provenance statement (`benchmark_values_provenance` in
-# BenchmarkResponse) distinguishing them from live inference, so the
-# zero-confabulation standard (Spec Section 2.10) is never breached. Exact
-# DeLong statistics for arbitrary paired score vectors are computed live by
-# the POST /analytics/delong-test endpoint (Spec Section 2.5 protocol).
-# ---------------------------------------------------------------------------
-_BENCHMARK_ROWS: List[Dict] = [
-    {
-        "model_architecture": "Cox Proportional Hazards",
-        "model_class": "Conventional Survival Baseline",
-        "test_auc": 0.732,
-        "delong_z_vs_coxph": 0.0,
-        "delong_p_value": 1.0,
-        "brier_score": 0.168,
-        "log_loss": 0.512,
-    },
-    {
-        "model_architecture": "Logistic Regression (ElasticNet)",
-        "model_class": "Classical Econometric Baseline",
-        "test_auc": 0.704,
-        "delong_z_vs_coxph": -1.84,
-        "delong_p_value": 0.0657,
-        "brier_score": 0.179,
-        "log_loss": 0.548,
-    },
-    {
-        "model_architecture": "Random Survival Forest",
-        "model_class": "Non-Linear Survival Ensemble",
-        "test_auc": 0.781,
-        "delong_z_vs_coxph": 2.89,
-        "delong_p_value": 0.0039,
-        "brier_score": 0.145,
-        "log_loss": 0.441,
-    },
-    {
-        "model_architecture": "Stage-Aware XGBoost (Proposed)",
-        "model_class": "Gradient Boosted Trees (Day-1)",
-        "test_auc": 0.814,
-        "delong_z_vs_coxph": 4.12,
-        "delong_p_value": 0.00001,
-        "brier_score": 0.128,
-        "log_loss": 0.395,
-    },
-]
-
 
 @router.get(
     "/analytics/cuf-gap",
@@ -146,31 +100,215 @@ def analyze_project_drivers(project: ProjectInput) -> ProjectDriversResponse:
 
 @router.get(
     "/analytics/benchmark-baseline",
-    response_model=BenchmarkResponse,
-    summary="MoSPI Dimension (b): ML vs. Conventional Statistics (DeLong Protocol)",
+    summary="MoSPI Dimension (b): ML vs Conventional Statistics (measured, DeLong)",
 )
-def get_statistical_benchmark() -> BenchmarkResponse:
+def get_statistical_benchmark() -> Dict:
     """
-    Directly answers MoSPI Problem Statement Dimension (b) using DeLong's
-    paired AUC test (DeLong et al., 1988) between the Stage-Aware XGBoost
-    classifier and the 6-month horizon-binarized Cox Proportional Hazards
-    baseline. Diebold-Mariano is methodologically invalid for this panel
-    (Spec Section 2.6) and is deliberately not used.
+    Answers MoSPI Problem Statement Dimension (b) with **measured** numbers.
+
+    Includes `actionable_cohort`, which answers the sharpest reviewer objection
+    head-on: "months_to_revised_date scores ~0.77 AUC alone, so isn't this just
+    a deadline rule?" The cohort table re-scores every model separately on
+    projects whose declared completion date has NOT yet passed -- the only
+    projects where a warning can still change an outcome -- and reports the
+    margin over an explicitly-fitted deadline heuristic.
+
+    Every figure returned here is read from `model/paimana_model_metrics.json`,
+    which is produced by `scripts/train_model.py` on the reconstructed MoSPI
+    panel. Nothing in this endpoint is a constant.
+
+    An earlier revision of this file hardcoded a benchmark table (XGBoost AUC
+    0.814 vs Cox 0.732, Z = 4.12) that had never been computed, and the README
+    quoted a third, different set of numbers. Those constants are deleted. If
+    the training pipeline has not been run, this endpoint returns HTTP 503 and
+    says so rather than substituting remembered values.
     """
-    return BenchmarkResponse(
-        dimension="Dimension (b): ML vs Conventional Statistical Methods",
-        evaluation_protocol="GroupKFold (grouped by project_id) + Out-of-Time cohort (train <= 2022; test 2023-2024)",
-        statistical_test="DeLong Paired AUC Test (DeLong, DeLong & Clarke-Pearson, Biometrics 1988)",
-        test_methodology_note=(
-            "AUC is a combinatorial rank-concordance metric over all case-control pairs and cannot be "
-            "decomposed into an additive point-wise loss differential d_t; the panel has no single 1D "
-            "time axis. Diebold-Mariano is therefore mathematically undefined here, while DeLong's "
-            "generalized U-statistic test requires zero distributional assumptions and operates on "
-            "paired placement values V10/V01 from the same evaluation cohort (Spec Section 2.6)."
-        ),
-        benchmark_results=_BENCHMARK_ROWS,
-        benchmark_values_provenance=BenchmarkResponse.model_fields["benchmark_values_provenance"].default,
-    )
+    metrics = load_training_metrics()
+    if metrics is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No measured metrics artifact found. Run: python scripts/build_panel.py "
+                "&& python scripts/train_model.py. This endpoint reports only measured "
+                "results and will not substitute illustrative values."
+            ),
+        )
+
+    horizons = metrics.get("horizons", {})
+    comparison = {
+        key: {
+            "horizon_months": res.get("horizon_months"),
+            "label": metrics.get("labels", {}).get(res.get("label", ""), res.get("label")),
+            "rows_labelled": res.get("rows_labelled"),
+            "positive_rate": res.get("positive_rate"),
+            "censoring_selection_caveat": res.get("censoring_selection_caveat"),
+            "generalisation_to_unseen_projects": res.get("splits", {}).get("primary", {}),
+            "forecasting_months_never_seen": res.get("splits", {}).get("out_of_time", {}),
+            "next_window_for_monitored_projects": res.get("splits", {}).get("deployment", {}),
+            "confound_guard": res.get("confound_guard"),
+            "actionable_cohort": res.get("actionable_cohort"),
+            "calibration": res.get("calibration"),
+        }
+        for key, res in horizons.items()
+        if res.get("status") == "ok"
+    }
+
+    return {
+        "dimension": "Dimension (b): ML vs Conventional Statistical Methods",
+        "provenance": metrics.get("provenance"),
+        "generated_at": metrics.get("generated_at"),
+        "model_version": metrics.get("model_version"),
+        "panel": metrics.get("panel"),
+        "leakage_policy": metrics.get("leakage_policy"),
+        "statistical_test": metrics.get("statistical_test"),
+        "calendar_split_status": metrics.get("calendar_split_status"),
+        "rejected_split": metrics.get("rejected_split"),
+        "cox_continuous_time": metrics.get("cox_continuous_time"),
+        "horizons": comparison,
+        "reproduce": metrics.get("reproduce"),
+    }
+
+
+@router.get(
+    "/analytics/model-metrics",
+    summary="Full measured evaluation artifact (single source of truth)",
+)
+def get_model_metrics() -> Dict:
+    """Returns `model/paimana_model_metrics.json` verbatim.
+
+    Exposed so a reviewer can audit every claim the dashboard makes -- splits,
+    baselines, DeLong tests, calibration, confound guard and feature gains --
+    against the artifact the training run actually wrote.
+    """
+    metrics = load_training_metrics()
+    if metrics is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No metrics artifact. Run scripts/build_panel.py then scripts/train_model.py.",
+        )
+    return metrics
+
+
+@router.get(
+    "/analytics/lead-time",
+    summary="Measured early-warning lead time vs. the ministry's filed revisions",
+)
+def get_lead_time() -> Dict:
+    """
+    How many months before the official revised date is filed does the model
+    already flag the project?
+
+    Measured on out-of-fold predictions, reported across a threshold sweep, and
+    always paired with the false-alarm rate that makes a lead-time figure
+    interpretable. The artifact states its own ceiling: the public feed exposes
+    a limited monthly window, so the reported medians are lower bounds.
+    """
+    report = load_lead_time_report()
+    if report is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No lead-time artifact. Run: python scripts/train_model.py "
+                "&& python scripts/lead_time_backtest.py"
+            ),
+        )
+    return report
+
+
+@router.get(
+    "/analytics/ordering-sensitivity",
+    summary="Robustness of the result to the reconstructed time axis",
+)
+def get_ordering_sensitivity() -> Dict:
+    """
+    The PAIMANA feed returns `Month: null` / `Year: null` on every record, so
+    the panel's snapshot order is reconstructed under assumption A1 rather than
+    observed. That is the platform's deepest methodological soft spot.
+
+    This endpoint reports what happens when the assumption is varied: the panel
+    is rebuilt under several alternative ordering rules — plus a deliberately
+    inverted **negative control** — and retrained under the identical protocol.
+    A stable AUC across plausible orderings, together with a clear degradation
+    under the inverted control, is the evidence that the panel is ordered by
+    something real.
+    """
+    report = load_ordering_sensitivity()
+    if report is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No ordering-sensitivity artifact. Run: python scripts/ordering_sensitivity.py"
+            ),
+        )
+    return report
+
+
+@router.get(
+    "/analytics/label-validity",
+    summary="Does a filed date revision correspond to physical distress?",
+)
+def get_label_validity() -> Dict:
+    """
+    The platform's target is "a date moved on a government form". This endpoint
+    reports whether that bureaucratic event tracks anything physical, measured
+    rather than argued.
+
+    It also contains the platform's most actionable finding for MoSPI: the
+    premise behind statutory rule F1 (GFR 2017 Rule 159) is **inverted** for
+    schedule forecasting. Project-months where physical progress runs ahead of
+    disbursement slip at roughly four times the rate of the months F1 actually
+    flags. F1 remains a valid financial-irregularity flag; it is not a schedule
+    predictor, and this is the evidence.
+    """
+    report = load_label_validity()
+    if report is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No label-validity artifact. Run: python scripts/label_validity.py",
+        )
+    return report
+
+
+@router.post(
+    "/analytics/horizons",
+    summary="Slip probability curve across 1 / 3 / 6-month horizons for one project",
+)
+def get_horizon_curve(project: ProjectInput) -> Dict:
+    """
+    A single risk score cannot tell a review committee whether a project slips
+    next month or next year. This returns the calibrated slip probability at
+    every trained horizon, which is what a PRAGATI agenda is actually built
+    against.
+
+    Features that cannot be derived from a one-month CUF snapshot are listed in
+    `feature_approximations` so the caller knows which inputs were estimated.
+    """
+    model_service = ModelService.get_instance()
+    if not model_service.is_loaded:
+        raise HTTPException(status_code=503, detail="Predictive model bundle is not loaded.")
+    if model_service.bundle_generation != "v2-panel-trained":
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Horizon forecasts require the v2 panel-trained bundle. "
+                "Run scripts/build_panel.py then scripts/train_model.py."
+            ),
+        )
+
+    _frame, approximations = model_service.build_frame(project)
+    return {
+        "project_id": project.project_id,
+        "project_name": project.project_name,
+        "sector": project.sector,
+        "horizons": model_service.predict_horizons(project),
+        "horizon_definitions": {
+            "1m": "revised completion date moves at the next monthly report",
+            "3m": "revised completion date moves at any report within 3 months",
+            "6m": "revised completion date moves at any report within 6 months",
+        },
+        "feature_approximations": approximations,
+        "model_version": model_service.model_version,
+    }
 
 
 @router.post(

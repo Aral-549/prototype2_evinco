@@ -31,11 +31,13 @@ def test_health():
     data = response.json()
     assert data["status"] == "HEALTHY"
     assert data["model_loaded"] is True
-    assert data["feature_count"] == 12
-    assert "has_revised_doc" in data["features"]
-    # Spec Section 4.1: quarantine must be reported and cover the outcome proxy
-    assert "has_revised_doc" in data["quarantined_features"]
-    assert "current_delay_months_robust" in data["quarantined_features"]
+    # v2 serves the 23-column panel design matrix. Leakage is handled by
+    # EXCLUSION at training time, so the outcome proxies must be absent from
+    # the served feature list entirely -- not present-but-zeroed as in v1.
+    assert data["feature_count"] == 22
+    assert "has_revised_doc" not in data["features"]
+    assert "current_delay_months" not in data["features"]
+    assert data["quarantined_features"] == []
 
 
 # ---------------------------------------------------------------- Single predict
@@ -72,7 +74,7 @@ def test_predict_project_healthy():
     assert data["capital_at_risk_crores"] >= 0.0
     # Road sector median is 12%
     assert data["sector_median_overrun_pct"] == 12.0
-    assert len(data["rule_signals"]) == 5
+    assert len(data["rule_signals"]) == 6
     assert len(data["shap_drivers"]) == 5
     assert 0.0 <= data["base_rate_probability"] <= 1.0
     assert len(data["prescriptive_interventions"]) >= 1
@@ -247,16 +249,30 @@ def test_cuf_gap_analysis_zero_confabulation():
     assert "impossible" in data["methodology_statement"]
     # Observable ceiling block
     ceiling = data["observable_ceiling"]
-    assert 0.75 <= ceiling["discriminative_auc_ceiling"] <= 0.90
+    assert 0.70 <= ceiling["discriminative_auc_ceiling"] <= 0.95
     assert ceiling["residual_classification_error"] == pytest.approx(
         1.0 - ceiling["discriminative_auc_ceiling"], abs=1e-6
     )
-    # NLP proxy augmentation block (Spec Section 2.9: 0.756 -> 0.814)
+    # The ceiling must be MEASURED, not a declared constant.
+    assert data["observable_ceiling_provenance"].startswith("MEASURED")
+
+    # NLP proxy augmentation: the public PAIMANA feed publishes no delay
+    # narratives (Remarks null on 14,917/14,917 records), so no augmentation
+    # delta can exist. A previous revision reported a 0.756 -> 0.814 gain from
+    # text that is not in the data. Every numeric field must now be the -1.0
+    # "not measurable" sentinel, with the reason stated.
     aug = data["proxy_augmentation"]
     assert len(aug["proxy_names"]) == 5
-    assert aug["auc_after"] > aug["auc_before"]
-    assert aug["auc_delta"] == pytest.approx(aug["auc_after"] - aug["auc_before"], abs=1e-9)
-    assert aug["rmse_after_pct"] < aug["rmse_before_pct"]
+    assert data["proxy_augmentation_provenance"].startswith("NOT MEASURABLE")
+    for field in (
+        "auc_before",
+        "auc_after",
+        "auc_delta",
+        "rmse_before_pct",
+        "rmse_after_pct",
+        "delayed_projects_citing_top_three_factors_pct",
+    ):
+        assert aug[field] == -1.0, f"{field} must be the not-measurable sentinel"
     # CUF 2.0 proposals with primary-source grounding
     assert len(data["missing_variables_recommended"]) >= 4
     for mv in data["missing_variables_recommended"]:
@@ -297,16 +313,29 @@ def test_statistical_benchmark_delong():
     response = client.get("/api/v1/analytics/benchmark-baseline")
     assert response.status_code == 200
     data = response.json()
-    assert len(data["benchmark_results"]) == 4
+
+    # Everything reported must come from the measured training artifact. The
+    # previous revision of this endpoint returned a hardcoded table that had
+    # never been computed; that is what this assertion exists to prevent.
+    assert data["provenance"] == "measured"
     assert "DeLong" in data["statistical_test"]
-    assert "Diebold-Mariano" in data["test_methodology_note"]  # cited as rejected
-    rows = {r["model_architecture"]: r for r in data["benchmark_results"]}
-    cox = rows["Cox Proportional Hazards"]
+    assert "Diebold-Mariano" in data["statistical_test"]  # cited as inapplicable
+
+    primary = data["horizons"]["1m"]["generalisation_to_unseen_projects"]
+    rows = {r["model_architecture"]: r for r in primary["results"] if "auc" in r}
     xgb = rows["Stage-Aware XGBoost (Proposed)"]
-    assert cox["delong_z_vs_coxph"] == 0.0  # baseline row
-    assert xgb["test_auc"] > cox["test_auc"]
-    assert xgb["delong_z_vs_coxph"] > 2.0
-    assert xgb["delong_p_value"] < 0.001
+    logit = rows["Logistic Regression (ElasticNet)"]
+    dtph = rows["Discrete-Time Proportional Hazards (cloglog)"]
+
+    # The proposed model must beat both classical baselines, and the margin
+    # must be certified by a real paired DeLong test on the same cohort.
+    assert xgb["auc"] > logit["auc"]
+    assert xgb["auc"] > dtph["auc"]
+    tests = {t["comparison"]: t for t in primary["delong_tests"] if "z_statistic" in t}
+    for key in ("xgboost vs logit", "xgboost vs dtph"):
+        assert tests[key]["z_statistic"] > 2.0
+        assert tests[key]["p_value"] < 0.001
+        assert tests[key]["significant_at_0.05"] is True
 
 
 def test_delong_endpoint_contract():
@@ -483,18 +512,35 @@ def test_quarantined_feature_never_drives_inference():
     )
 
 
-def test_quarantined_current_delay_months_never_drives_inference():
+def test_schedule_state_is_permitted_but_outcome_proxies_are_not():
     """
-    Spec Sections 1.2 / 4.1: `current_delay_months` is the accumulated
-    schedule slippage beyond the original statutory completion date -- a
-    post-facto bureaucratic outcome record exactly like `has_revised_doc`.
-    It is quarantined (`LEAKAGE_QUARANTINED_FEATURES` ->
-    `current_delay_months_robust`), so varying it in the payload must leave
-    P_model bit-for-bit invariant (Spec Section 4.1; README Section 4.1).
+    v2 draws the leakage line in a different place than v1, deliberately.
+
+    v1 quarantined `current_delay_months` and asserted P_model must be
+    bit-identical as it varied. That was the wrong line. `current_delay_months`
+    is the slippage ALREADY on the record at time t -- the gap between the
+    original completion date and the date the ministry is currently declaring.
+    A desk officer reading the file on day t can see it. It is state, not
+    outcome, and suppressing it threw away the strongest legitimate signal in
+    the data.
+
+    What must never be used is the OUTCOME: whether the date moves *again* at
+    the next report. That is the label. `has_revised_doc` and
+    `current_delay_months_robust` encode it and are excluded from the design
+    matrix entirely (see contracts/model_training.md).
+
+    So this test asserts the opposite of its v1 predecessor: schedule state
+    MUST move the prediction, and it must move it in the correct direction.
     """
+    from app.services.model_service import ModelService
+
+    ms = ModelService.get_instance()
+    for banned in ("has_revised_doc", "current_delay_months", "current_delay_months_robust"):
+        assert banned not in ms.feature_columns
+
     base = {
         "project_id": "TEST-LEAK-2",
-        "project_name": "Delay Quarantine Verification Project",
+        "project_name": "Schedule State Verification Project",
         "sector": "Railways",
         "implementing_agency": "RVNL",
         "original_cost": 3000.0,
@@ -502,29 +548,50 @@ def test_quarantined_current_delay_months_never_drives_inference():
         "expenditure": 2000.0,
         "physical_progress": 40.0,
         "progress_change_recent": 1.0,
+        "original_duration_months": 60.0,
     }
-    r1 = client.post("/api/v1/predict/project", json=base).json()
-    r2 = client.post("/api/v1/predict/project", json={**base, "current_delay_months": 48.0}).json()
-    r3 = client.post("/api/v1/predict/project", json={**base, "current_delay_months": 0.0}).json()
-    assert r1["p_model"] == r2["p_model"] == r3["p_model"], (
-        "quarantined current_delay_months proxy must not influence P_model"
-    )
+
+    def p_of(**over):
+        r = client.post("/api/v1/predict/project", json={**base, **over})
+        assert r.status_code == 200
+        return r.json()["p_model"]
+
+    badly_overdue = p_of(months_elapsed=84.0, current_delay_months=0.0)
+    mildly_overdue = p_of(months_elapsed=66.0, current_delay_months=0.0)
+    on_schedule = p_of(months_elapsed=40.0, current_delay_months=0.0)
+    date_extended = p_of(months_elapsed=66.0, current_delay_months=24.0)
+
+    # Further past the declared completion date => higher slip risk.
+    assert badly_overdue > mildly_overdue > on_schedule
+
+    # Same elapsed time, but the declared date was already pushed out so the
+    # project is no longer past it: risk must fall, not rise.
+    assert date_extended < mildly_overdue
 
 
-def test_leak_free_frame_hard_zeroes_all_quarantined_columns():
+def test_v2_excludes_leakage_proxies_from_design_matrix_entirely():
     """
-    Frame-level proof of the Section 1.2 quarantine: the leak-free design
-    matrix produced for the legacy booster must carry 0.0 in EVERY column
-    listed in LEAKAGE_QUARANTINED_FEATURES, regardless of what the CUF
-    payload declared. This closes the audit gap where
-    `current_delay_months_robust` silently forwarded the raw payload value
-    into the booster (contradicting the quarantine narrative in the
-    `has_revised_doc` SHAP translation catalog).
+    v2's leakage guarantee is stronger than v1's and is asserted differently.
+
+    v1 trained ON `has_revised_doc` (34% of booster gain) and then zeroed it at
+    inference. That is train/serve skew, not a leakage fix: it pushed every
+    live project into leaf regions whose training base rate was ~0, and
+    p_model collapsed below 0.035 across all 2,155 real projects.
+
+    v2 excludes those fields from the design matrix at TRAINING time, so there
+    is nothing to zero. This test asserts the columns are absent rather than
+    zeroed, and that the served probabilities actually spread.
     """
     from app.services.model_service import ModelService
 
     ms = ModelService.get_instance()
-    assert ms.is_loaded, "legacy model bundle must be loadable for this test"
+    assert ms.is_loaded
+    assert ms.bundle_generation == "v2-panel-trained", (
+        "run scripts/build_panel.py && scripts/train_model.py to build the v2 bundle"
+    )
+
+    for banned in ("has_revised_doc", "current_delay_months", "current_delay_months_robust"):
+        assert banned not in ms.feature_columns
 
     project = ProjectInput(
         project_id="TEST-LEAK-3",
@@ -537,18 +604,166 @@ def test_leak_free_frame_hard_zeroes_all_quarantined_columns():
         months_elapsed=72.0,
         current_delay_months=48.0,
     )
-    frame = ms.build_leak_free_frame(project)
-    for col in sorted(LEAKAGE_QUARANTINED_FEATURES & set(frame.columns)):
-        assert float(frame[col].iloc[0]) == 0.0, (
-            f"quarantined column '{col}' must be hard-zeroed in the leak-free frame"
+    frame, _approximations = ms.build_frame(project)
+    assert list(frame.columns) == ms.feature_columns
+    assert not frame.isna().any().any()
+    assert LEAKAGE_QUARANTINED_FEATURES.isdisjoint(set(frame.columns))
+
+
+def test_v2_probabilities_are_not_degenerate():
+    """Regression guard for the v1 collapse: p_model must actually spread.
+
+    The v1 bundle returned p_model in [0.0001, 0.0345] for every one of the
+    2,155 real projects, which made Capital-at-Risk meaningless and left the
+    ML branch unable to ever dominate the RuleFloor. If a future change
+    reintroduces train/serve skew, this test fails.
+    """
+    from app.services.real_data import get_evaluated_portfolio
+
+    scores = [e.p_model for e in get_evaluated_portfolio()]
+    assert len(scores) > 100
+    assert max(scores) > 0.5, "no project scores above 0.5 -- model is collapsed"
+    assert max(scores) - min(scores) > 0.5, "p_model range is degenerate"
+    tiers = {e.risk_tier for e in get_evaluated_portfolio()}
+    assert "CRITICAL" in tiers or "HIGH" in tiers
+
+
+def test_risk_ranking_slim_mode_drops_only_unused_payload():
+    """The leaderboard must not have to download 7.7 MB to render a table.
+
+    `rule_signals` alone is ~82% of each assessment (2,918 of 3,563 bytes) --
+    six statutory signals each carrying a paragraph of rationale, none of which
+    a leaderboard row displays. Serving the whole portfolio unslimmed took 7.9s
+    and 7.7 MB, which is enough to make the dashboard look broken on venue wifi.
+    """
+    full = client.get("/api/v1/portfolio/risk-ranking?limit=50")
+    slim = client.get("/api/v1/portfolio/risk-ranking?limit=50&slim=true")
+    assert full.status_code == 200 and slim.status_code == 200
+
+    assert len(slim.json()) == len(full.json())
+    assert len(slim.content) < len(full.content) / 3, "slim must be a large saving"
+
+    row = slim.json()[0]
+    for dropped in ("rule_signals", "shap_drivers", "prescriptive_interventions"):
+        assert dropped not in row
+    # Everything the leaderboard actually renders must survive.
+    for kept in (
+        "project_id", "project_name", "sector", "implementing_agency",
+        "original_cost_crores", "physical_progress", "gov_score",
+        "risk_tier", "dominant_source", "capital_at_risk_crores",
+    ):
+        assert kept in row, f"slim mode dropped a field the table renders: {kept}"
+
+    # Ordering must be identical -- slim is a projection, not a different query.
+    assert [r["project_id"] for r in slim.json()] == [r["project_id"] for r in full.json()]
+
+
+def test_assessment_carries_physical_progress():
+    """Regression: the dashboard's Progress column rendered "-" for every row.
+
+    `ProjectGovernanceAssessment` never carried `physical_progress`, so the
+    leaderboard's guard (`p.physical_progress != null ? ... : '-'`) silently
+    took the null branch for all 2,155 projects. The column was dead.
+    """
+    payload = {
+        "project_id": "TEST-PROG-1",
+        "project_name": "Progress Field Regression",
+        "sector": "Railways",
+        "implementing_agency": "RVNL",
+        "original_cost": 1000.0,
+        "expenditure": 400.0,
+        "physical_progress": 37.5,
+    }
+    body = client.post("/api/v1/predict/project", json=payload).json()
+    assert body["physical_progress"] == pytest.approx(37.5)
+
+    ranked = client.get("/api/v1/portfolio/risk-ranking?limit=25").json()
+    assert all("physical_progress" in r for r in ranked)
+    # Not every project is at 0% -- i.e. the field is really populated, not defaulted.
+    assert any(r["physical_progress"] > 0 for r in ranked)
+
+
+def test_dashboard_styling_is_served_locally_not_from_a_cdn():
+    """The demo must not depend on venue wifi.
+
+    The dashboard takes its ENTIRE layout from Tailwind utility classes. When
+    those came from cdn.tailwindcss.com, a blocked or absent connection left an
+    unstyled wall of text -- a total demo failure with no error message.
+    Tailwind is now vendored under frontend/vendor/ and served from /static.
+    """
+    asset = client.get("/static/vendor/tailwind.play.js")
+    assert asset.status_code == 200
+    assert len(asset.content) > 100_000, "vendored Tailwind looks truncated"
+
+    html = client.get("/dashboard").text
+    assert "/static/vendor/tailwind.play.js" in html
+    # The CDN may remain only as a fallback behind a window.tailwind check.
+    cdn_at = html.find("cdn.tailwindcss.com")
+    if cdn_at != -1:
+        assert "window.tailwind" in html[max(0, cdn_at - 400):cdn_at], (
+            "the CDN must only be reachable as a guarded fallback"
         )
 
-    # End-to-end invariance at the service layer: a maximally distressed
-    # schedule (48 months of accumulated delay) and a pristine schedule
-    # (zero delay) must produce identical P_model.
-    pristine = project.model_copy(update={"current_delay_months": 0.0})
-    p_distressed, _, _ = ms.explain(project)
-    p_pristine, _, _ = ms.explain(pristine)
-    assert p_distressed == p_pristine, (
-        "P_model must be invariant to current_delay_months under the quarantine"
-    )
+
+def test_dashboard_kpi_captions_are_not_hardcoded_sample_text():
+    """Regression: the KPI sub-captions contradicted the numbers above them.
+
+    The headline tiles were populated live from /portfolio/summary (2,155
+    projects, Rs 41.8 lakh crore), while the small print beneath them was
+    static HTML reading "8 Sample Megaprojects", "3 of 8 Projects" and
+    "1 Crit / 2 Mod / 5 Low". A reviewer reading the caption would conclude the
+    platform ran on eight rows.
+    """
+    html = client.get("/dashboard").text
+    for stale in ("8 Sample Megaprojects", "3 of 8 Projects", ">1 Crit<", ">2 Mod<", ">5 Low<"):
+        assert stale not in html, f"stale hardcoded KPI caption still present: {stale}"
+    # The captions must exist as live-populated elements instead.
+    for element_id in ("kpi-project-count", "kpi-override-detail", "kpi-tier-breakdown"):
+        assert f'id="{element_id}"' in html
+
+
+def test_project_detail_matches_the_leaderboard_row_exactly():
+    """A detail view must never contradict the list it was opened from.
+
+    The front end originally rebuilt a ProjectInput from a slim leaderboard row
+    and re-scored it. The slim payload has no schedule fields, so
+    `months_elapsed`, `original_duration_months` and `current_delay_months`
+    fell back to ProjectInput defaults — a generic early-stage project — and
+    p_model collapsed to ~0.01 for EVERY project while the row it came from
+    said 0.15-0.51. The forecast curve shown in that sheet was meaningless.
+
+    This endpoint scores the project's own stored record, so the two views
+    agree by construction rather than by luck.
+    """
+    rows = client.get("/api/v1/portfolio/risk-ranking?slim=true&limit=5").json()
+    assert rows, "portfolio should not be empty"
+
+    for row in rows:
+        detail = client.get(f"/api/v1/portfolio/project/{row['project_id']}")
+        assert detail.status_code == 200
+        body = detail.json()
+        a = body["assessment"]
+
+        assert a["project_id"] == row["project_id"]
+        assert a["p_model"] == pytest.approx(row["p_model"], abs=1e-9)
+        assert a["gov_score"] == pytest.approx(row["gov_score"], abs=1e-9)
+        assert a["rule_floor"] == pytest.approx(row["rule_floor"], abs=1e-9)
+        assert a["capital_at_risk_crores"] == pytest.approx(
+            row["capital_at_risk_crores"], abs=1e-9
+        )
+
+        # The detail view carries what the leaderboard deliberately omits.
+        assert len(a["rule_signals"]) == 6
+        assert a["shap_drivers"]
+
+        # The 1-month horizon is the same quantity as p_model, so a drift
+        # between them would mean the sheet's headline and its forecast
+        # disagree with each other.
+        if body["horizons"]:
+            assert body["horizons"]["1m"]["probability"] == pytest.approx(
+                row["p_model"], abs=5e-3
+            )
+
+
+def test_project_detail_404s_on_unknown_id():
+    assert client.get("/api/v1/portfolio/project/NOT_A_PROJECT").status_code == 404

@@ -131,7 +131,7 @@ class TestFullAssessment:
         expected_car = 2000.0 * 0.05 * max(90.0, 25.0) / 100.0  # overrun 90% > median 25%
         assert assessment.capital_at_risk_crores == pytest.approx(expected_car, abs=0.01)
         assert assessment.effective_overrun_pct == 90.0
-        assert len(assessment.rule_signals) == 5
+        assert len(assessment.rule_signals) == 6
         assert any("PRAGATI" in i for i in assessment.prescriptive_interventions)
 
     def test_healthy_project_ml_dominant(self):

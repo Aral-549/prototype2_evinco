@@ -43,14 +43,19 @@ export function ProjectSheet({
   const [error, setError] = useState<string | null>(null);
   const [showAllFlags, setShowAllFlags] = useState(false);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
+  const [prevRowId, setPrevRowId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!row) return;
+  if (row && row.project_id !== prevRowId) {
+    setPrevRowId(row.project_id);
     setAssessment(null);
     setHorizons(null);
     setError(null);
     setShowAllFlags(false);
     setShowAllDrivers(false);
+  }
+
+  useEffect(() => {
+    if (!row) return;
 
     // One call, scored from the project's own stored record. Rebuilding an
     // input from the slim row and re-scoring it produced a detail view that

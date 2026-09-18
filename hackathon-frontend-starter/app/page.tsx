@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { api, type PortfolioSummary, type ProjectRow } from "@/lib/api";
 import {
   count,
-  crore,
   croreCompact,
   percent,
   TIER_DOT,
@@ -14,7 +13,7 @@ import {
 } from "@/lib/format";
 import { AttentionList } from "@/components/attention-list";
 import { ProjectSheet } from "@/components/project-sheet";
-import { SectionHeader, Separator, Stat, Surface } from "@/components/ui/primitives";
+import { SectionHeader, Stat, Surface } from "@/components/ui/primitives";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 

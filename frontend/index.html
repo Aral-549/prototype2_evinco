@@ -11,7 +11,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
   <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind vendored locally so the dashboard renders with no internet.
+       The page's entire layout comes from Tailwind classes, so a blocked or
+       absent CDN would otherwise leave an unstyled wall of text. Falls back
+       to the CDN only if the local copy is missing. -->
+  <script src="/static/vendor/tailwind.play.js"></script>
+  <script>
+    if (!window.tailwind) {
+      document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+    }
+  </script>
 
   <script>
     tailwind.config = {
@@ -170,9 +179,9 @@
       <!-- Card 1 -->
       <div class="bg-white border border-slate-200 rounded p-4 shadow-sm">
         <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Monitored Capex</div>
-        <div class="text-2xl font-bold text-slate-900 mt-1 num-tabular" id="kpi-total-capex">&#8377;97,266 Cr</div>
+        <div class="text-2xl font-bold text-slate-900 mt-1 num-tabular" id="kpi-total-capex">&#8377;&mdash;</div>
         <div class="text-xs text-slate-500 mt-1 flex items-center justify-between">
-          <span>8 Sample Megaprojects</span>
+          <span id="kpi-project-count">Loading portfolio&hellip;</span>
           <span class="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">&#8377;150+ Cr Tier</span>
         </div>
       </div>
@@ -180,7 +189,7 @@
       <!-- Card 2 -->
       <div class="bg-white border border-slate-200 border-l-4 border-l-red-600 rounded p-4 shadow-sm">
         <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Aggregate Capital-at-Risk (CaR)</div>
-        <div class="text-2xl font-bold text-red-700 mt-1 num-tabular" id="kpi-total-car">&#8377;103.11 Cr</div>
+        <div class="text-2xl font-bold text-red-700 mt-1 num-tabular" id="kpi-total-car">&#8377;&mdash;</div>
         <div class="text-xs text-slate-500 mt-1">
           Bayesian Sector-Median Overrun Bound
         </div>
@@ -189,20 +198,18 @@
       <!-- Card 3 -->
       <div class="bg-white border border-slate-200 border-l-4 border-l-amber-600 rounded p-4 shadow-sm">
         <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Statutory RuleFloor Overrides</div>
-        <div class="text-2xl font-bold text-amber-800 mt-1 num-tabular" id="kpi-override-rate">37.5%</div>
+        <div class="text-2xl font-bold text-amber-800 mt-1 num-tabular" id="kpi-override-rate">&mdash;</div>
         <div class="text-xs text-slate-500 mt-1">
-          <span class="font-semibold text-slate-700">3 of 8 Projects</span> governed by statutory floor
+          <span class="font-semibold text-slate-700" id="kpi-override-detail">&mdash;</span> governed by statutory floor
         </div>
       </div>
 
       <!-- Card 4 -->
       <div class="bg-white border border-slate-200 rounded p-4 shadow-sm">
         <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Portfolio Risk Distribution</div>
-        <div class="text-2xl font-bold text-slate-900 mt-1 num-tabular" id="kpi-distress-count">1 Critical</div>
-        <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-          <span class="text-red-700 font-semibold">1 Crit</span> •
-          <span class="text-amber-700 font-semibold">2 Mod</span> •
-          <span class="text-emerald-700 font-semibold">5 Low</span>
+        <div class="text-2xl font-bold text-slate-900 mt-1 num-tabular" id="kpi-distress-count">&mdash;</div>
+        <div class="text-xs text-slate-500 mt-1 flex items-center gap-2" id="kpi-tier-breakdown">
+          <span class="text-slate-400">&mdash;</span>
         </div>
       </div>
 
@@ -372,14 +379,30 @@
 
           </div>
 
+          <!-- Multi-Horizon Slip Forecast -->
+          <div class="bg-white border border-slate-200 rounded p-4 shadow-sm space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-800">Schedule-Slip Forecast Curve</span>
+              <span class="text-[10px] font-mono text-slate-500">calibrated &middot; P(6m) &ge; P(3m) &ge; P(1m)</span>
+            </div>
+            <p class="text-[11px] text-slate-500">
+              Probability that the officially declared completion date is pushed further out within each window.
+              A single risk score cannot tell a review committee whether a project slips next month or next year.
+            </p>
+            <div id="horizon-curve" class="grid grid-cols-3 gap-2 pt-1">
+              <div class="col-span-3 text-[11px] text-slate-400 font-mono">Awaiting evaluation &hellip;</div>
+            </div>
+            <div id="horizon-approximations" class="text-[10px] text-slate-500"></div>
+          </div>
+
           <!-- Deterministic RuleFloor Breakdown Grid -->
           <div class="bg-white border border-slate-200 rounded p-4 shadow-sm space-y-2">
             <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-800">Statutory Administrative RuleFloor Flags (F1 - F5)</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-800">Statutory Administrative RuleFloor Flags (F1 - F6)</span>
               <span class="text-[10px] font-mono text-slate-500">Clamping: min(100, &Sigma; w_k)</span>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-2" id="statutory-flags-grid">
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-2" id="statutory-flags-grid">
               <!-- Dynamically populated F1-F5 cards -->
             </div>
           </div>
@@ -464,8 +487,8 @@
         
         <div class="border-b border-slate-200 pb-3 flex items-center justify-between">
           <div>
-            <h2 class="text-base font-bold text-slate-900">MoSPI Dimension (b): DeLong Paired AUC Significance Benchmark</h2>
-            <p class="text-xs text-slate-500">Methodologically grounded comparative evaluation vs Cox Proportional Hazards baseline</p>
+            <h2 class="text-base font-bold text-slate-900">MoSPI Dimension (b): Measured Benchmark vs Classical Statistics</h2>
+            <p class="text-xs text-slate-500">Measured out-of-fold comparison against classical econometric and survival baselines</p>
           </div>
           <span class="text-xs font-mono font-semibold bg-slate-100 border border-slate-300 px-2 py-0.5 rounded text-slate-700">DeLong et al. (1988)</span>
         </div>
@@ -473,26 +496,12 @@
         <div class="p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 space-y-1">
           <span class="font-bold text-slate-900">Methodological Standard: Why Diebold-Mariano is Excluded</span>
           <p>
-            AUC is a combinatorial rank-concordance metric across all case-control pairs and cannot be decomposed into an additive point-wise loss sequence $d_t$. The monthly project monitoring panel is not a 1D time-series. The platform strictly implements DeLong's generalized U-statistic test.
+            AUC is a combinatorial rank-concordance metric across all case-control pairs and cannot be decomposed into an additive point-wise loss sequence $d_t$. The monthly project monitoring panel is not a 1D time-series. The platform strictly implements DeLong's generalized U-statistic test. Every figure below is read live from the training run&#39;s metrics artifact; no benchmark constants are stored in this page.
           </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          <div class="border border-slate-200 bg-white rounded p-4 text-center">
-            <div class="text-xs font-semibold text-slate-500 uppercase">Stage-Aware XGBoost (ML)</div>
-            <div class="text-3xl font-extrabold text-blue-700 mt-1 num-tabular">0.824</div>
-            <div class="text-xs text-slate-500 mt-1">Out-of-Time GroupKFold AUC</div>
-          </div>
-          <div class="border border-slate-200 bg-white rounded p-4 text-center">
-            <div class="text-xs font-semibold text-slate-500 uppercase">Cox-PH Horizon Baseline</div>
-            <div class="text-3xl font-extrabold text-slate-700 mt-1 num-tabular">0.712</div>
-            <div class="text-xs text-slate-500 mt-1">6-Month Binarized Survival Baseline</div>
-          </div>
-          <div class="border border-slate-200 bg-white rounded p-4 text-center">
-            <div class="text-xs font-semibold text-slate-500 uppercase">DeLong Statistical Significance</div>
-            <div class="text-3xl font-extrabold text-emerald-700 mt-1 num-tabular">Z = 3.42</div>
-            <div class="text-xs font-bold text-emerald-800 mt-1">p = 0.00062 &lt; 0.001 (Statistically Significant)</div>
-          </div>
+        <div id="benchmark-live" class="pt-2">
+          <div class="text-xs text-slate-500 font-mono">Loading measured benchmark from /api/v1/analytics/model-metrics ...</div>
         </div>
 
         <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
@@ -514,45 +523,19 @@
         <div class="border-b border-slate-200 pb-3 flex items-center justify-between">
           <div>
             <h2 class="text-base font-bold text-slate-900">MoSPI Dimension (c): CUF Information Bound & Policy Reform</h2>
-            <p class="text-xs text-slate-500">Decomposition of observable feature ceiling versus uncollected administrative variables</p>
+            <p class="text-xs text-slate-500">Measured ceiling of observable CUF fields, and what the public feed does not publish</p>
           </div>
           <span class="text-xs font-mono font-semibold bg-slate-100 border border-slate-300 px-2 py-0.5 rounded text-slate-700">Zero-Confabulation Protocol</span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="space-y-3 text-xs text-slate-700">
-            <h3 class="font-bold text-sm text-slate-900">Observable Ceiling Decomposition</h3>
+            <h3 class="font-bold text-sm text-slate-900">Observable Ceiling (Measured)</h3>
             <p class="leading-relaxed">
-              Under information theory, variance decomposition cannot be computed on variables never recorded. The platform quantifies the empirical asymptotic ceiling of current CUF milestones and measures the marginal lift from NLP proxy mining.
+              A variance decomposition over variables that were never recorded is not computable, and this platform does not invent one. What it reports is the <strong>measured</strong> discriminative ceiling of the observable CUF feature set and, separately, whether the NLP delay-narrative augmentation is measurable at all on the public feed.
             </p>
-            <div class="space-y-2 pt-2">
-              <div>
-                <div class="flex justify-between mb-1 font-semibold">
-                  <span>Observable CUF Feature Ceiling</span>
-                  <span class="font-mono text-blue-700">64.2%</span>
-                </div>
-                <div class="w-full bg-slate-200 h-2 rounded-sm overflow-hidden">
-                  <div class="bg-blue-600 h-full" style="width: 64.2%"></div>
-                </div>
-              </div>
-              <div>
-                <div class="flex justify-between mb-1 font-semibold">
-                  <span>NLP Remarks Proxy Augmentation</span>
-                  <span class="font-mono text-emerald-700">+11.4%</span>
-                </div>
-                <div class="w-full bg-slate-200 h-2 rounded-sm overflow-hidden">
-                  <div class="bg-emerald-600 h-full" style="width: 11.4%"></div>
-                </div>
-              </div>
-              <div>
-                <div class="flex justify-between mb-1 font-semibold">
-                  <span>Latent Unrecorded Residual (CUF 2.0 Target)</span>
-                  <span class="font-mono text-slate-600">24.4%</span>
-                </div>
-                <div class="w-full bg-slate-200 h-2 rounded-sm overflow-hidden">
-                  <div class="bg-slate-500 h-full" style="width: 24.4%"></div>
-                </div>
-              </div>
+            <div id="cuf-live" class="space-y-2 pt-2">
+              <div class="text-xs text-slate-500 font-mono">Loading measured ceiling from /api/v1/analytics/cuf-gap ...</div>
             </div>
           </div>
 
@@ -717,6 +700,8 @@
       await fetchPortfolioSummary();
       await fetchPortfolioRiskRanking();
       loadPresetProject();
+      fetchMeasuredBenchmark();
+      fetchCufCeiling();
     });
 
     function switchTab(tabId) {
@@ -784,6 +769,23 @@
 
           const crit = data.risk_tier_counts.CRITICAL || 0;
           document.getElementById('kpi-distress-count').innerText = `${crit} Critical`;
+
+          // Sub-captions must agree with the headline figures above them.
+          document.getElementById('kpi-project-count').innerText =
+            `${total.toLocaleString()} monitored projects`;
+          document.getElementById('kpi-override-detail').innerText =
+            `${overrides.toLocaleString()} of ${total.toLocaleString()} projects`;
+
+          const tiers = [
+            ['CRITICAL', 'Crit', 'text-red-700'],
+            ['HIGH', 'High', 'text-orange-700'],
+            ['MODERATE', 'Mod', 'text-amber-700'],
+            ['LOW', 'Low', 'text-emerald-700'],
+          ];
+          document.getElementById('kpi-tier-breakdown').innerHTML = tiers
+            .map(([key, label, cls]) =>
+              `<span class="${cls} font-semibold">${(data.risk_tier_counts[key] || 0).toLocaleString()} ${label}</span>`)
+            .join(' &bull; ');
         }
       } catch (err) {
         console.warn('Summary fetch error:', err);
@@ -792,7 +794,9 @@
 
     async function fetchPortfolioRiskRanking() {
       try {
-        const res = await fetch('/api/v1/portfolio/risk-ranking');
+        // slim=true drops rule_signals/shap/interventions (~82% of the payload).
+        // The leaderboard renders none of them, and the full response is 7.7 MB.
+        const res = await fetch('/api/v1/portfolio/risk-ranking?slim=true');
         if (res.ok) {
           portfolioData = await res.json();
           renderPortfolioTable(portfolioData);
@@ -918,6 +922,7 @@
           const data = await response.json();
           currentEvaluation = data;
           renderEvaluationVerdict(data);
+          fetchHorizonCurve(payload);
         }
       } catch (err) {
         console.error('API Error:', err);
@@ -1022,6 +1027,339 @@
         li.innerText = p;
         list.appendChild(li);
       });
+    }
+
+    // ---------------------------------------------------------------------
+    // Measured benchmark. Nothing below is a stored constant: every number is
+    // read from model/paimana_model_metrics.json, written by
+    // scripts/train_model.py. If the pipeline has not been run the API returns
+    // 503 and this panel says so rather than showing a plausible placeholder.
+    // ---------------------------------------------------------------------
+    async function fetchMeasuredBenchmark() {
+      const host = document.getElementById('benchmark-live');
+      if (!host) return;
+      try {
+        const res = await fetch('/api/v1/analytics/model-metrics');
+        if (!res.ok) {
+          const detail = (await res.json().catch(() => ({}))).detail || 'metrics artifact unavailable';
+          host.innerHTML = `<div class="p-3 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900">
+            <span class="font-bold">No measured metrics available.</span>
+            <div class="mt-1 font-mono text-[11px]">${escapeHtml(detail)}</div>
+          </div>`;
+          return;
+        }
+        const m = await res.json();
+        const leadRes = await fetch('/api/v1/analytics/lead-time');
+        const lead = leadRes.ok ? await leadRes.json() : null;
+
+        const order = ['1m', '3m', '6m'];
+        let html = `<div class="flex items-center gap-2 text-[11px] mb-3">
+          <span class="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold uppercase tracking-wide">${escapeHtml(m.provenance || 'unknown')}</span>
+          <span class="text-slate-500 font-mono">model ${escapeHtml(m.model_version || '?')} &middot; ${escapeHtml((m.panel && m.panel.rows_used) || '?')} transitions &middot; ${escapeHtml((m.panel && m.panel.projects) || '?')} projects &middot; seed ${escapeHtml(m.seed || '?')}</span>
+        </div>`;
+
+        html += `<div class="overflow-x-auto"><table class="w-full text-xs border border-slate-200">
+          <thead class="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider">
+            <tr>
+              <th class="text-left px-2 py-1.5 border-b border-slate-200">Model</th>
+              ${order.map(h => `<th class="text-right px-2 py-1.5 border-b border-slate-200">${h} AUC</th>`).join('')}
+            </tr>
+          </thead><tbody>`;
+
+        const byKey = {};
+        order.forEach(h => {
+          const res = (m.horizons || {})[h];
+          if (!res || res.status !== 'ok') return;
+          (res.splits.primary.results || []).forEach(r => {
+            if (r.auc === undefined) return;
+            byKey[r.key] = byKey[r.key] || { name: r.model_architecture, cls: r.model_class, auc: {} };
+            byKey[r.key].auc[h] = r.auc;
+          });
+        });
+
+        // Proposed model first, then baselines by descending 1m AUC.
+        const keys = Object.keys(byKey).sort((a, b) => {
+          if (a === 'xgboost') return -1;
+          if (b === 'xgboost') return 1;
+          return (byKey[b].auc['1m'] || 0) - (byKey[a].auc['1m'] || 0);
+        });
+        keys.forEach(k => {
+          const row = byKey[k];
+          const strong = k === 'xgboost';
+          html += `<tr class="${strong ? 'bg-blue-50 font-bold text-blue-900' : 'text-slate-700'}">
+            <td class="px-2 py-1.5 border-b border-slate-100">${escapeHtml(row.name)}
+              <span class="block text-[10px] font-normal text-slate-400">${escapeHtml(row.cls)}</span></td>
+            ${order.map(h => `<td class="px-2 py-1.5 text-right num-tabular border-b border-slate-100">${row.auc[h] !== undefined ? row.auc[h].toFixed(3) : '&mdash;'}</td>`).join('')}
+          </tr>`;
+        });
+        html += '</tbody></table></div>';
+
+        // DeLong tests at the 1-month horizon.
+        const primary = (m.horizons || {})['1m'];
+        if (primary && primary.status === 'ok') {
+          const tests = (primary.splits.primary.delong_tests || []).filter(t => t.z_statistic !== undefined);
+          html += `<div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">`;
+          tests.forEach(t => {
+            const pretty = t.comparison.replace('xgboost vs ', 'vs ');
+            html += `<div class="border border-slate-200 rounded p-2 text-[11px] bg-white">
+              <div class="font-semibold text-slate-800">1-month ${escapeHtml(pretty)}</div>
+              <div class="text-slate-600 num-tabular">&Delta;AUC ${t.auc_delta.toFixed(3)} &middot; Z = ${t.z_statistic.toFixed(2)} &middot; p ${t.p_value < 1e-15 ? '&lt; 1e-15' : '= ' + t.p_value.toExponential(2)}</div>
+            </div>`;
+          });
+          html += '</div>';
+
+          // Confound guard: the number a careful reviewer asks for.
+          const strata = (primary.confound_guard && primary.confound_guard.strata) || [];
+          if (strata.length) {
+            html += `<div class="mt-3 border border-slate-200 rounded p-3 bg-slate-50">
+              <div class="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Confound guard &mdash; 1-month AUC within history-length strata</div>
+              <p class="text-[11px] text-slate-600 mt-1">History length correlates with the outcome on this panel. Discrimination that survives <em>inside</em> each stratum is project dynamics, not that artifact.</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">`;
+            strata.forEach(st => {
+              html += `<div class="bg-white border border-slate-200 rounded p-2 text-center">
+                <div class="text-[10px] text-slate-500">${escapeHtml(st.history_length)}</div>
+                <div class="text-lg font-bold text-slate-800 num-tabular">${st.auc === null ? '&mdash;' : st.auc.toFixed(3)}</div>
+                <div class="text-[10px] text-slate-400">n=${st.n} &middot; base ${st.positive_rate === null ? '?' : st.positive_rate.toFixed(2)}</div>
+              </div>`;
+            });
+            html += '</div></div>';
+          }
+
+          // The sharpest objection a reviewer can raise, answered in place.
+          const ac = primary.actionable_cohort;
+          if (ac && Array.isArray(ac.cohorts)) {
+            html += `<div class="mt-3 border border-blue-300 rounded p-3 bg-blue-50">
+              <div class="text-[11px] font-bold text-blue-900 uppercase tracking-wider">Is this just a deadline rule?</div>
+              <p class="text-[11px] text-blue-800 mt-1">${escapeHtml(ac.question)}</p>
+              <div class="overflow-x-auto mt-2"><table class="w-full text-[11px] bg-white border border-blue-200">
+                <thead class="bg-blue-100 text-blue-900 uppercase text-[9px] tracking-wider">
+                  <tr>
+                    <th class="text-left px-2 py-1">Cohort</th>
+                    <th class="text-right px-2 py-1">n</th>
+                    <th class="text-right px-2 py-1">Base</th>
+                    <th class="text-right px-2 py-1">XGBoost</th>
+                    <th class="text-right px-2 py-1">Logistic</th>
+                    <th class="text-right px-2 py-1">Deadline rule</th>
+                    <th class="text-right px-2 py-1">Margin</th>
+                  </tr>
+                </thead><tbody>`;
+            ac.cohorts.forEach(c => {
+              if (c.status) {
+                html += `<tr class="text-slate-500"><td class="px-2 py-1">${escapeHtml(c.cohort)}</td>
+                  <td class="px-2 py-1 text-right">${c.n}</td>
+                  <td class="px-2 py-1 text-right" colspan="5">${escapeHtml(c.status)}</td></tr>`;
+                return;
+              }
+              const fmt = v => (v === null || v === undefined) ? '&mdash;' : v.toFixed(4);
+              const actionable = c.cohort === 'not_yet_overdue';
+              const margin = c.xgboost_minus_deadline_rule;
+              html += `<tr class="${actionable ? 'bg-blue-100 font-bold text-blue-900' : 'text-slate-700'}">
+                <td class="px-2 py-1">${escapeHtml(c.cohort.replace(/_/g, ' '))}</td>
+                <td class="px-2 py-1 text-right num-tabular">${c.n}</td>
+                <td class="px-2 py-1 text-right num-tabular">${c.positive_rate === null ? '&mdash;' : c.positive_rate.toFixed(3)}</td>
+                <td class="px-2 py-1 text-right num-tabular">${fmt(c.auc_xgboost)}</td>
+                <td class="px-2 py-1 text-right num-tabular">${fmt(c.auc_logit)}</td>
+                <td class="px-2 py-1 text-right num-tabular">${fmt(c.auc_deadline_continuous)}</td>
+                <td class="px-2 py-1 text-right num-tabular ${margin > 0 ? 'text-emerald-700' : 'text-rose-700'}">${margin === undefined ? '&mdash;' : (margin > 0 ? '+' : '') + margin}</td>
+              </tr>`;
+            });
+            html += `</tbody></table></div>
+              <p class="text-[11px] text-blue-900 mt-2 font-semibold">${escapeHtml(ac.verdict)}</p>
+            </div>`;
+          }
+
+          const cal = primary.calibration || {};
+          html += `<div class="mt-3 text-[11px] text-slate-600 font-mono">
+            Calibration (1m, ${escapeHtml(cal.method || '?')}): ECE ${cal.ece_before} &rarr; ${cal.ece_after_cross_fitted} cross-fitted over project-grouped folds.
+          </div>`;
+        }
+
+        if (lead && lead.recommended_threshold) {
+          const r = lead.recommended_threshold;
+          html += `<div class="mt-3 border border-emerald-300 bg-emerald-50 rounded p-3">
+            <div class="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">Measured early-warning lead time</div>
+            <div class="text-sm text-emerald-900 mt-1">
+              Median <span class="font-extrabold num-tabular">${r.median_lead_months}</span> months before the revised date is filed
+              &middot; precision ${(r.alert_precision * 100).toFixed(0)}%
+              &middot; recall ${(r.recall * 100).toFixed(0)}%
+              &middot; false alarms ${(r.false_alarm_rate * 100).toFixed(0)}%
+              <span class="text-[10px] font-mono">(threshold ${r.threshold})</span>
+            </div>
+            <p class="text-[11px] text-emerald-800 mt-1">${escapeHtml((lead.caveats && lead.caveats.observation_window) || '')}</p>
+          </div>`;
+        }
+
+        if (m.rejected_split) {
+          html += `<div class="mt-3 border border-slate-300 bg-white rounded p-3">
+            <div class="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Split deliberately rejected: ${escapeHtml(m.rejected_split.name)}</div>
+            <p class="text-[11px] text-slate-600 mt-1">${escapeHtml(m.rejected_split.reason)}</p>
+          </div>`;
+        }
+
+        host.innerHTML = html + await robustnessPanels();
+      } catch (err) {
+        host.innerHTML = `<div class="text-xs text-rose-700 font-mono">Benchmark load failed: ${escapeHtml(String(err))}</div>`;
+      }
+    }
+
+    // Two self-challenges published as their own artifacts: does the result
+    // survive a different reconstructed time axis, and does the label track
+    // anything physical?
+    async function robustnessPanels() {
+      let out = '';
+      try {
+        const res = await fetch('/api/v1/analytics/ordering-sensitivity');
+        if (res.ok) {
+          const o = await res.json();
+          const rows = Object.entries(o.results || {})
+            .filter(([, v]) => v && v.status === 'ok')
+            .map(([k, v]) => {
+              const control = k === o.negative_control;
+              return `<tr class="${control ? 'text-rose-700 font-semibold' : 'text-slate-700'}">
+                <td class="px-2 py-1">${escapeHtml(k.replace(/_/g, ' '))}${control ? ' (negative control)' : ''}</td>
+                <td class="px-2 py-1 text-right num-tabular">${v.auc.toFixed(4)}</td>
+              </tr>`;
+            }).join('');
+          out += `<div class="mt-3 border border-slate-300 rounded p-3 bg-white">
+            <div class="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Robustness: the reconstructed time axis</div>
+            <p class="text-[11px] text-slate-600 mt-1">${escapeHtml(o.question)}</p>
+            <div class="overflow-x-auto mt-2"><table class="w-full text-[11px] border border-slate-200">
+              <thead class="bg-slate-50 text-slate-600 uppercase text-[9px] tracking-wider">
+                <tr><th class="text-left px-2 py-1">Ordering rule</th><th class="text-right px-2 py-1">1m AUC</th></tr>
+              </thead><tbody>${rows}</tbody></table></div>
+            <p class="text-[11px] text-emerald-800 mt-2 font-semibold">${escapeHtml(o.stability_verdict)}</p>
+            <p class="text-[11px] text-emerald-800 mt-1">${escapeHtml(o.negative_control_verdict)}</p>
+          </div>`;
+        }
+      } catch (err) { /* robustness panels are additive; never block the page */ }
+
+      try {
+        const res = await fetch('/api/v1/analytics/label-validity');
+        if (res.ok) {
+          const lv = await res.json();
+          const f1 = lv.rule_f1_premise_test || {};
+          const bands = (f1.bands || []).map(b => `<tr class="text-slate-700">
+            <td class="px-2 py-1">${escapeHtml(b.band)}</td>
+            <td class="px-2 py-1 text-right num-tabular">${b.n}</td>
+            <td class="px-2 py-1 text-right num-tabular font-semibold">${b.slip_rate === null ? '&mdash;' : b.slip_rate.toFixed(4)}</td>
+          </tr>`).join('');
+          out += `<div class="mt-3 border border-amber-300 rounded p-3 bg-amber-50">
+            <div class="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Is the label physical, or just paperwork?</div>
+            <p class="text-[11px] text-amber-900 mt-1">${escapeHtml(lv.verdict)}</p>
+            ${bands ? `<div class="mt-2 text-[11px] font-bold text-amber-900">Rule F1's own premise, tested against the outcome</div>
+            <div class="overflow-x-auto mt-1"><table class="w-full text-[11px] bg-white border border-amber-200">
+              <thead class="bg-amber-100 text-amber-900 uppercase text-[9px] tracking-wider">
+                <tr><th class="text-left px-2 py-1">Spend vs progress</th><th class="text-right px-2 py-1">n</th><th class="text-right px-2 py-1">Slip rate</th></tr>
+              </thead><tbody>${bands}</tbody></table></div>
+            <p class="text-[11px] text-amber-900 mt-2">${escapeHtml(f1.interpretation || '')}</p>` : ''}
+          </div>`;
+        }
+      } catch (err) { /* additive */ }
+
+      return out;
+    }
+
+    async function fetchCufCeiling() {
+      const host = document.getElementById('cuf-live');
+      if (!host) return;
+      try {
+        const res = await fetch('/api/v1/analytics/cuf-gap');
+        if (!res.ok) { host.innerHTML = '<div class="text-xs text-amber-800">CUF gap analysis unavailable.</div>'; return; }
+        const d = await res.json();
+        const ceiling = d.observable_ceiling || {};
+        const aucPct = (ceiling.discriminative_auc_ceiling || 0) * 100;
+
+        let html = `<div>
+          <div class="flex justify-between mb-1 font-semibold">
+            <span>Observable CUF feature ceiling (out-of-fold AUC)</span>
+            <span class="font-mono text-blue-700 num-tabular">${(ceiling.discriminative_auc_ceiling || 0).toFixed(3)}</span>
+          </div>
+          <div class="w-full bg-slate-200 h-2 rounded-sm overflow-hidden">
+            <div class="bg-blue-600 h-full" style="width: ${aucPct.toFixed(1)}%"></div>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1">${escapeHtml(d.observable_ceiling_provenance || '')}</div>
+        </div>`;
+
+        // The NLP augmentation is NOT measurable on the public feed. Rather than
+        // draw a bar for a number that does not exist, say why.
+        const aug = d.proxy_augmentation || {};
+        const notMeasurable = aug.auc_delta === -1.0;
+        html += `<div class="mt-3 border rounded p-2.5 ${notMeasurable ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50'}">
+          <div class="flex justify-between font-semibold ${notMeasurable ? 'text-amber-900' : 'text-emerald-900'}">
+            <span>NLP delay-narrative augmentation</span>
+            <span class="font-mono">${notMeasurable ? 'NOT MEASURABLE' : '+' + aug.auc_delta.toFixed(3) + ' AUC'}</span>
+          </div>
+          <p class="text-[11px] ${notMeasurable ? 'text-amber-800' : 'text-emerald-800'} mt-1">${escapeHtml(d.proxy_augmentation_provenance || '')}</p>
+          <div class="text-[10px] text-slate-500 mt-1.5">Extractors implemented and unit-tested: ${escapeHtml((aug.proxy_names || []).join(', '))}</div>
+        </div>`;
+
+        html += `<div class="mt-3 text-[11px] text-slate-600 leading-relaxed border-t border-slate-200 pt-2">
+          ${escapeHtml(d.methodology_statement || '')}
+        </div>`;
+
+        host.innerHTML = html;
+      } catch (err) {
+        host.innerHTML = `<div class="text-xs text-rose-700 font-mono">CUF load failed: ${escapeHtml(String(err))}</div>`;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Multi-horizon forecast. The nesting P(6m) >= P(3m) >= P(1m) is enforced
+    // server-side; where it binds, the API flags it and we surface that rather
+    // than hiding the adjustment.
+    async function fetchHorizonCurve(payload) {
+      const host = document.getElementById('horizon-curve');
+      const notes = document.getElementById('horizon-approximations');
+      if (!host) return;
+      try {
+        const res = await fetch('/api/v1/analytics/horizons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          host.innerHTML = '<div class="col-span-3 text-[11px] text-amber-700 font-mono">Horizon forecast unavailable (v2 bundle required).</div>';
+          if (notes) notes.innerHTML = '';
+          return;
+        }
+        const data = await res.json();
+        const defs = data.horizon_definitions || {};
+        const order = ['1m', '3m', '6m'];
+        const labels = { '1m': 'Next report', '3m': 'Within 3 months', '6m': 'Within 6 months' };
+
+        host.innerHTML = order.map(h => {
+          const entry = (data.horizons || {})[h];
+          if (!entry) return '';
+          const pct = entry.probability * 100;
+          const tone = pct >= 60 ? 'text-red-700' : (pct >= 30 ? 'text-amber-700' : 'text-emerald-700');
+          const bar = pct >= 60 ? 'bg-red-600' : (pct >= 30 ? 'bg-amber-500' : 'bg-emerald-600');
+          const adj = entry.monotonicity_enforced
+            ? '<span class="block text-[9px] text-slate-400 mt-0.5" title="Independent model output was lower than the shorter horizon; a running maximum restores the nesting constraint.">nesting enforced</span>'
+            : '';
+          return `<div class="border border-slate-200 rounded p-2.5 text-center bg-white" title="${escapeHtml(defs[h] || '')}">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500">${escapeHtml(labels[h] || h)}</div>
+            <div class="text-2xl font-extrabold num-tabular ${tone} mt-0.5">${pct.toFixed(1)}%</div>
+            <div class="w-full bg-slate-200 h-1.5 rounded-sm overflow-hidden mt-1.5">
+              <div class="${bar} h-full" style="width: ${Math.min(100, pct).toFixed(1)}%"></div>
+            </div>
+            ${adj}
+          </div>`;
+        }).join('');
+
+        const appx = Object.keys(data.feature_approximations || {});
+        if (notes) {
+          notes.innerHTML = appx.length
+            ? `Estimated from a single monthly snapshot (no project history supplied): <span class="font-mono">${escapeHtml(appx.join(', '))}</span>.`
+            : '';
+        }
+      } catch (err) {
+        host.innerHTML = `<div class="col-span-3 text-[11px] text-rose-700 font-mono">Horizon load failed: ${escapeHtml(String(err))}</div>`;
+      }
     }
 
     async function runLiveDeLongTest() {

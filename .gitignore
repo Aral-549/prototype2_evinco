@@ -30,5 +30,14 @@ Thumbs.db
 .env
 .env.local
 
-# Raw web scrapes
-data/*_raw.json
+# The raw MoSPI harvest is deliberately NOT ignored. Every performance figure
+# the platform reports is derived from it via scripts/build_panel.py, and the
+# README promises end-to-end reproduction, so excluding it would make that
+# promise false. ~12.6 MB.
+# data/paimana_live_raw.json
+
+# Python/pytest scratch
+.pytest_cache/
+
+# TypeScript incremental build cache
+hackathon-frontend-starter/tsconfig.tsbuildinfo

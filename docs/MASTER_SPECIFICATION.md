@@ -5,8 +5,38 @@
 **Target Platform:** Ministry of Statistics and Programme Implementation (MoSPI) – Infrastructure and Project Monitoring Division (IPMD)  
 **System Designation:** PAIMANA (Project Assessment, Infrastructure Monitoring & Analytics Network Architecture)  
 **Author:** Teamwork Specification Architecture Group  
-**Status:** Released / Production Specification  
+**Status:** Design specification — superseded on measured claims, see ERRATA below  
 **Classification:** Official / Architectural Standard  
+
+---
+
+> ## ⚠️ ERRATA — READ BEFORE CITING ANY NUMBER IN THIS DOCUMENT
+>
+> This is a **design specification**, written before the model was trained. Where it quotes
+> model performance, those figures were **target/illustrative values that were never measured**.
+> They are superseded by `model/paimana_model_metrics.json`, produced by
+> `scripts/train_model.py` and reproducible with:
+>
+> ```bash
+> python scripts/build_panel.py && python scripts/train_model.py && python scripts/lead_time_backtest.py
+> ```
+>
+> **Corrections (measured on 8,838 real project-month transitions from 1,631 MoSPI projects):**
+>
+> | Claim in this document | Measured reality |
+> |---|---|
+> | Table A: XGBoost AUC 0.814, Cox-PH 0.732, Z = +4.12 | 1-month horizon: XGBoost **0.854**, discrete-time PH **0.793**, logistic **0.798**; Z = 15.15 vs PH, 14.87 vs logistic |
+> | "Random Survival Forest 0.781" | Not fitted. No such row exists in the metrics artifact. |
+> | Cox Proportional Hazards as the survival baseline | Replaced by the **discrete-time PH model (complementary log-log, Prentice & Gloeckler 1978)** — the correct specification for a monthly panel with heavy ties. Continuous-time Cox is reported only if `lifelines` is installed; otherwise the row reads `status: "unavailable"`. |
+> | Out-of-Time test cohort | **Rejected as confounded on this panel.** History length determines how far back a project's rows reach, so a calendar split measures that artifact. Primary split is GroupKFold by `project_id`. See `rejected_split` in the metrics artifact. |
+> | NLP proxies improve AUC by +0.058 (0.756 → 0.814); cost RMSE 24.1% → 21.3% | **Not measurable.** `Remarks`, `RevisedDateReason` and `RevisedCostReason` are null on **14,917 / 14,917** records from the public portal. The extractor is implemented and unit-tested but has no input. All augmentation figures now return the sentinel `-1.0`. |
+> | Cost-escalation regression benchmarks (Table B) | Not fitted. `COST_OVERRUN_PERC` is zero on every public record, so no cost-overrun target exists. |
+> | Leakage handled by **quarantining** `has_revised_doc` at inference | **This was the platform's central bug.** Zeroing a feature carrying 34.22% of booster gain is train/serve skew, and it collapsed `p_model` below 0.035 on all 2,155 live projects. v2 **excludes** leaky fields from the design matrix at training time. See `BUGLOG.md`. |
+> | Statutory flags F1–F5 | **F6 (Declared Completion Date Elapsed) added** from measurement: it covers 32.1% of project-months at a 4.3× lift. F1+F2 scored AUC **0.433** against the real outcome — worse than random. See `contracts/rule_floor.md`. |
+>
+> The binding specifications for implemented behaviour are in **`contracts/`**, not this document.
+
+---
 
 ---
 
@@ -379,9 +409,14 @@ Schedule overrun is a binary/survival classification task ($Y_{\text{schedule}} 
 | **Random Survival Forest** | Non-Linear Survival Ensemble | 0.781 | +2.89 | 0.0039** | 0.145 | 0.441 |
 | **Stage-Aware XGBoost (Proposed)** | Gradient Boosted Trees (Day-1) | **0.814** | **+4.12** | **< 0.0001\*\*\*** | **0.128** | **0.395** |
 
-*Interpretation:* Stage-Aware XGBoost achieves a statistically significant improvement over Cox-PH ($Z = +4.12, p < 0.0001$), formally resolving MoSPI Dimension (b).
+*Interpretation:* Stage-Aware XGBoost achieves a statistically significant improvement over the classical survival baseline, formally resolving MoSPI Dimension (b).
+
+> **⚠️ Table A above is a design target that was never measured.** The measured result is XGBoost **0.854** vs discrete-time proportional hazards **0.793** (DeLong $Z = 15.15$, $p < 10^{-15}$) on 8,838 real transitions under GroupKFold by `project_id`. See `model/paimana_model_metrics.json`.
 
 **Table B: Continuous Cost Escalation Regressor Benchmark (Target: % Cost Overrun)**
+
+> **⚠️ Table B was never measured and cannot be on this data.** `COST_OVERRUN_PERC` is zero on all 14,917 public PAIMANA records, so no cost-escalation target exists to regress. No cost regressor is fitted, and `/api/v1/analytics/cuf-gap` returns `cost_regression_r2_ceiling: -1.0` as an explicit not-applicable sentinel.
+
 | Model Architecture | Model Class | RMSE (%) | MAE (%) | $R^2$ | Pinball Loss $\mathcal{L}_{0.10}$ | Pinball Loss $\mathcal{L}_{0.50}$ | Pinball Loss $\mathcal{L}_{0.90}$ |
 |---|---|---|---|---|---|---|---|
 | **Ordinary Least Squares (OLS)** | Classical Linear Baseline | 28.4% | 18.2% | 0.284 | N/A | N/A | N/A |
@@ -457,8 +492,15 @@ def extract_bottleneck_proxies(remarks: str | None) -> Dict[str, int]:
 
 #### Empirical Proxy Impact
 When the baseline model is augmented with these five extracted NLP bottleneck indicators $\{I_{\text{Land\_RoW}}, I_{\text{Env\_Forest}}, I_{\text{Legal\_Contractor}}, I_{\text{Utility\_Interagency}}, I_{\text{Local\_Geology}}\}$:
-- Test AUC improves by $+0.058$ (from $0.756 \to 0.814$).
-- Cost overrun RMSE decreases by $2.8\%$ (from $24.1\% \to 21.3\%$).
+> **⚠️ The figures in this subsection were never measured and cannot be.** The public PAIMANA
+> portal returns `Remarks`, `RevisedDateReason` and `RevisedCostReason` as null on **14,917 of
+> 14,917** records, so the NLP bottleneck proxies have no source text. The extractor is
+> implemented and unit-tested; `/api/v1/analytics/cuf-gap` returns the sentinel `-1.0` for every
+> augmentation figure, with the reason attached. This absence is the concrete argument for the
+> CUF 2.0 field proposal, and is the honest answer to Dimension (c).
+
+- ~~Test AUC improves by $+0.058$ (from $0.756 \to 0.814$).~~ **NOT MEASURABLE — see above.**
+- ~~Cost overrun RMSE decreases by $2.8\%$ (from $24.1\% \to 21.3\%$).~~ **NOT MEASURABLE — `COST_OVERRUN_PERC` is zero on every public record.**
 - In over **60% of delayed projects** in MoSPI Flash Reports, implementing agencies explicitly cite land acquisition, forest clearance, or contractor litigation. This provides definitive empirical evidence that the missing variable gap constitutes the primary ceiling on prediction accuracy.
 
 ---

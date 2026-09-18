@@ -1,0 +1,105 @@
+{
+  "generated_at": "2026-09-18T01:28:57",
+  "source_file": "data/paimana_monthly_raw.json",
+  "source_sha256": "80ca3d737e7db3ce",
+  "slip_threshold_days": 15,
+  "min_order_confidence": 0.6,
+  "harvest_month": "2026-09",
+  "counts": {
+    "raw_records": 18601,
+    "unique_projects": 2243,
+    "dated_projects": 2243,
+    "transitions_dropped_no_label": 4827,
+    "projects_dropped_single_snapshot": 67,
+    "transitions_emitted": 11531,
+    "positives": 2065,
+    "censored_6m": 4787,
+    "censored_3m": 2710,
+    "expenditure_unit_rescaled": 4,
+    "dated_projects_with_backward_progress": 1
+  },
+  "positive_rate": 0.1791,
+  "revised_date_movement": {
+    "flat": 9269,
+    "pushed": 2143,
+    "pulled": 119
+  },
+  "time_axis": {
+    "mode": "observed",
+    "dated_projects": 2243,
+    "reconstructed_projects": 0,
+    "explanation": "OBSERVED: every record carries the portal's own freeze month (scripts/harvest_monthly.py), so snapshot order is read from the calendar and assumptions A1/A2 below do not apply. Horizon windows are real calendar months and `gap_months` records the actual spacing between consecutive reports.",
+    "projects_with_backward_reported_progress": 1
+  },
+  "assumptions_apply": false,
+  "assumptions": {
+    "A1_monotone_ordering": "Cumulative expenditure and physical progress are non-decreasing in real time within a project; snapshots are ordered by (expenditure, progress, revised_date). The PAIMANA feed returns Month=null/Year=null on every record, so this order is reconstructed, not observed.",
+    "A2_monthly_calendar_stamp": "Snapshots are monthly and the newest corresponds to 2026-09. Earlier snapshots are stamped one month apart. Stamps are approximate and used only for out-of-time splitting and for expressing lead time in months."
+  },
+  "fields_absent_from_live_feed": {
+    "Remarks": "0/18601 populated (0.0%)",
+    "RevisedDateReason": "0/18601 populated (0.0%)",
+    "RevisedCostReason": "0/18601 populated (0.0%)",
+    "StateName": "0/18601 populated (0.0%)",
+    "DELAYED_TIME": "0/18601 populated (0.0%)",
+    "COST_OVERRUN_PERC": "0/18601 populated (0.0%)",
+    "COR_PERC": "0/18601 populated (0.0%)",
+    "TOR_PERC": "0/18601 populated (0.0%)",
+    "StartDate": "0/18601 populated (0.0%)",
+    "AgencyName": "0/18601 populated (0.0%)"
+  },
+  "feature_columns": [
+    "original_cost",
+    "log_original_cost",
+    "expenditure",
+    "expenditure_pct",
+    "expenditure_delta",
+    "expenditure_delta_pct",
+    "physical_progress",
+    "progress_delta",
+    "progress_delta_3m",
+    "remaining_progress_pct",
+    "spend_progress_gap",
+    "burn_to_progress_ratio",
+    "months_elapsed",
+    "original_duration_months",
+    "elapsed_ratio",
+    "schedule_pressure",
+    "months_to_revised_date",
+    "revised_date_already_slipped_months",
+    "stall_streak",
+    "progress_velocity",
+    "required_velocity",
+    "velocity_deficit"
+  ],
+  "label_column": "slip_next",
+  "sector_frequency_reference_only": {
+    "Aviation": 0.012929,
+    "Coal": 0.057066,
+    "Construction": 0.001337,
+    "Education": 0.015604,
+    "Healthcare": 0.022737,
+    "Logistics Infrastructure": 0.001337,
+    "Petroleum": 0.050379,
+    "Power": 0.029871,
+    "Railways": 0.140883,
+    "Real Estate": 0.009808,
+    "Roads & Highways": 0.529202,
+    "Shipping": 0.004012,
+    "Steel": 0.017387,
+    "Telecommunications": 0.015604,
+    "Tourism, Hospitality & Wellness": 0.000892,
+    "Transmission & Distribution": 0.036558,
+    "Urban Transport": 0.014712,
+    "Water Resources": 0.039679
+  },
+  "horizon_labels": [
+    "slip_within_3m",
+    "slip_within_6m"
+  ],
+  "horizon_months": [
+    3,
+    6
+  ],
+  "censoring_policy": "Horizon labels are left empty (NaN) when the remaining observation window is shorter than the horizon and no slip occurred inside it. Censored rows are dropped at training time for that horizon; they are never coded as negatives."
+}

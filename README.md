@@ -244,4 +244,3 @@ prototype2_evinco/
 * **Team Name:** Evinco
 * **Live Online Demo:** [https://evinco-sih.centralindia.cloudapp.azure.com/paimana](https://evinco-sih.centralindia.cloudapp.azure.com/paimana)
 * **Executive Cockpit:** [https://evinco-sih.centralindia.cloudapp.azure.com/dashboard](https://evinco-sih.centralindia.cloudapp.azure.com/dashboard)
-* **Contact Email:** `shaik2.mitmpl2025@learner.manipal.edu`
